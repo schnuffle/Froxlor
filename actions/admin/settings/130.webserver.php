@@ -112,6 +112,58 @@ return array(
 					'default' => '/var/customers/logs/',
 					'save_method' => 'storeSettingField'
 				),
+				'system_logfiles_script' => array(
+					'label' => $lng['serversettings']['logfiles_script'],
+					'settinggroup' => 'system',
+					'varname' => 'logfiles_script',
+					'type' => 'string',
+					'string_type' => '',
+					'default' => '',
+					'save_method' => 'storeSettingField',
+					'websrv_avail' => array(
+						'apache2'
+					)
+				),
+				'system_logfiles_piped' => array(
+					'label' => $lng['serversettings']['logfiles_piped'],
+					'settinggroup' => 'system',
+					'varname' => 'logfiles_piped',
+					'type' => 'bool',
+					'default' => false,
+					'save_method' => 'storeSettingField',
+					'websrv_avail' => array(
+						'apache2'
+					)
+				),
+				'system_logfiles_format' => array(
+					'label' => $lng['serversettings']['logfiles_format'],
+					'settinggroup' => 'system',
+					'varname' => 'logfiles_format',
+					'type' => 'string',
+					'default' => '',
+					'string_emptyallowed' => true,
+					'save_method' => 'storeSettingField',
+					'websrv_avail' => array(
+						'apache2',
+						'nginx'
+					)
+				),
+				'system_logfiles_type' => array(
+					'label' => $lng['serversettings']['logfiles_type'],
+					'settinggroup' => 'system',
+					'varname' => 'logfiles_type',
+					'type' => 'option',
+					'default' => '1',
+					'option_mode' => 'one',
+					'option_options' => array(
+						'1' => 'combined',
+						'2' => 'vhost_combined'
+					),
+					'save_method' => 'storeSettingField',
+					'websrv_avail' => array(
+						'apache2'
+					)
+				),
 				'system_customersslpath' => array(
 					'label' => $lng['serversettings']['customerssl_directory'],
 					'settinggroup' => 'system',

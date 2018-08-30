@@ -3948,3 +3948,53 @@ if (isDatabaseVersion('201802130')) {
 
 	updateToDbVersion('201802250');
 }
+
+if (isDatabaseVersion('201802250')) {
+
+	showUpdateStep("Adding webserver logfile settings");
+	Settings::AddNew("system.logfiles_format",  '');
+	Settings::AddNew("system.logfiles_type",  '1');
+	Settings::AddNew("system.logfiles_piped",  '0');
+	lastStepStatus(0);
+
+	updateToDbVersion('201805240');
+}
+
+if (isDatabaseVersion('201805240')) {
+
+	showUpdateStep("Adding webserver logfile-script settings");
+	Settings::AddNew("system.logfiles_script",  '');
+	lastStepStatus(0);
+
+	updateToDbVersion('201805241');
+}
+
+if (isDatabaseVersion('201805241')) {
+
+	$do_update = true;
+	showUpdateStep("Checking for required PHP json-extension");
+	if (! extension_loaded('json')) {
+		$do_update = false;
+		lastStepStatus(2, 'not installed');
+	} else {
+		lastStepStatus(0);
+
+		showUpdateStep("Checking for current cronjobs that need converting");
+		$result_tasks_stmt = Database::query("
+			SELECT * FROM `" . TABLE_PANEL_TASKS . "` ORDER BY `id` ASC
+		");
+		$upd_stmt = Database::prepare("UPDATE `" . TABLE_PANEL_TASKS . "` SET `data` = :data WHERE `id` = :taskid");
+		while ($row = $result_tasks_stmt->fetch(PDO::FETCH_ASSOC)) {
+			if (! empty($row['data'])) {
+				$data = unserialize($row['data']);
+				Database::pexecute($upd_stmt, array(
+					'data' => json_encode($data),
+					'taskid' => $row['id']
+				));
+			}
+		}
+		lastStepStatus(0);
+
+		updateToDbVersion('201805290');
+	}
+}
