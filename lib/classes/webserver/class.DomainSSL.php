@@ -77,6 +77,7 @@ class DomainSSL {
 			// initialize optional files
 			$ssl_files['ssl_ca_file'] = '';
 			$ssl_files['ssl_cert_chainfile'] = '';
+			$ssl_files['ssl_cert_fullchainfile'] = '';
 			// set them if they are != empty
 			if ($dom_certs['ssl_ca_file'] != '') {
 				$ssl_files['ssl_ca_file'] = makeCorrectFile($sslcertpath.'/'.$domain['domain'].'_CA.pem');
@@ -89,10 +90,12 @@ class DomainSSL {
 					$ssl_files['ssl_cert_chainfile'] = makeCorrectFile($sslcertpath.'/'.$domain['domain'].'_chain.pem');
 				}
 			}
+
 			// will only be generated to be used externally, froxlor does not need this
 			if ($dom_certs['ssl_fullchain_file'] != '') {
 				$ssl_files['ssl_fullchain_file'] = makeCorrectFile($sslcertpath.'/'.$domain['domain'].'_fullchain.pem');
 			}
+
 			// create them on the filesystem
 			foreach ($ssl_files as $type => $filename) {
 				if ($filename != '') {
