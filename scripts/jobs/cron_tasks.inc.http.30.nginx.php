@@ -73,8 +73,22 @@ class nginx extends HttpConfigBase
 			$this->logger->logAction(CRON_ACTION, LOG_INFO, 'nginx::reload: restarting php processes');
 			safe_exec(Settings::Get('system.phpreload_command'));
 		} elseif ((int) Settings::Get('phpfpm.enabled') == 1) {
-			$this->logger->logAction(CRON_ACTION, LOG_INFO, 'nginx::reload: reloading php-fpm');
-			safe_exec(escapeshellcmd(Settings::Get('phpfpm.reload')));
+			// get all start/stop commands
+			$startstop_sel = Database::prepare("SELECT reload_cmd, config_dir FROM `" . TABLE_PANEL_FPMDAEMONS . "`");
+			Database::pexecute($startstop_sel);
+			$restart_cmds = $startstop_sel->fetchAll(PDO::FETCH_ASSOC);
+			// restart all php-fpm instances
+			foreach ($restart_cmds as $restart_cmd) {
+				// check whether the config dir is empty (no domains uses this daemon)
+				// so we need to create a dummy
+				$_conffiles = glob(makeCorrectFile($restart_cmd['config_dir'] . "/*.conf"));
+				if ($_conffiles === false || empty($_conffiles)) {
+					$this->logger->logAction(CRON_ACTION, LOG_INFO, 'nginx::reload: fpm config directory "' . $restart_cmd['config_dir'] . '" is empty. Creating dummy.');
+					phpinterface_fpm::createDummyPool($restart_cmd['config_dir']);
+				}
+				$this->logger->logAction(CRON_ACTION, LOG_INFO, 'nginx::reload: running ' . $restart_cmd['reload_cmd']);
+				safe_exec(escapeshellcmd($restart_cmd['reload_cmd']));
+			}
 		}
 	}
 
@@ -224,7 +238,7 @@ class nginx extends HttpConfigBase
 					} else {
 						$_sslport = $this->checkAlternativeSslPort();
 						$mypath = 'https://' . Settings::Get('system.hostname') . $_sslport . '/';
-						$this->nginx_data[$vhost_filename] .= "\t" . 'if ($request_uri !~ ^/.well-known/acme-challenge/\w+$) {' . "\n";
+						$this->nginx_data[$vhost_filename] .= "\t" . 'if ($request_uri !~ ^/.well-known/acme-challenge/[-\w]+$) {' . "\n";
 						$this->nginx_data[$vhost_filename] .= "\t\t" . 'return 301 ' . $mypath . '$request_uri;' . "\n";
 						$this->nginx_data[$vhost_filename] .= "\t" . '}' . "\n";
 					}
@@ -418,7 +432,7 @@ class nginx extends HttpConfigBase
 				$_vhost_content .= $this->processSpecialConfigTemplate($ipandport['default_vhostconf_domain'], $domain, $domain['ip'], $domain['port'], $ssl_vhost) . "\n";
 			}
 
-			$http2 = $ssl_vhost == true && (isset($domain['http2']) && $domain['http2'] == '1');
+			$http2 = $ssl_vhost == true && (isset($domain['http2']) && $domain['http2'] == '1' && Settings::Get('system.http2_support') == '1');
 
             $vhost_content .= "\t" . 'listen ' . $ipport . ($ssl_vhost == true ? ' ssl' : '') . ($http2 == true ? ' http2' : '') . ';' . "\n";
 		}
@@ -471,9 +485,9 @@ class nginx extends HttpConfigBase
 			}
 
 			// Get domain's redirect code
-			$code = getDomainRedirectCode($domain['id'], '301');
+			$code = getDomainRedirectCode($domain['id']);
 
-			$vhost_content .= "\t" . 'if ($request_uri !~ ^/.well-known/acme-challenge/\w+$) {' . "\n";
+			$vhost_content .= "\t" . 'if ($request_uri !~ ^/.well-known/acme-challenge/[-\w]+$) {' . "\n";
 			$vhost_content .= "\t\t" . 'return ' . $code .' ' . $uri . '$request_uri;' . "\n";
 			$vhost_content .= "\t" . '}' . "\n";
 		} else {
@@ -609,7 +623,7 @@ class nginx extends HttpConfigBase
 			} else {
 				// obsolete: ssl on now belongs to the listen block as 'ssl' at the end
 				// $sslsettings .= "\t" . 'ssl on;' . "\n";
-				$sslsettings .= "\t" . 'ssl_protocols TLSv1 TLSv1.2;' . "\n";
+				$sslsettings .= "\t" . 'ssl_protocols ' . str_replace(",", " ", Settings::Get('system.ssl_protocols')) . ';' . "\n";
 				$sslsettings .= "\t" . 'ssl_ciphers ' . Settings::Get('system.ssl_cipher_list') . ';' . "\n";
 				$sslsettings .= "\t" . 'ssl_ecdh_curve secp384r1;' . "\n";
 				$sslsettings .= "\t" . 'ssl_prefer_server_ciphers on;' . "\n";
@@ -902,7 +916,9 @@ class nginx extends HttpConfigBase
 
 		if ($domain['phpenabled_customer'] == 1 && $domain['phpenabled_vhost'] == '1') {
 			$webroot_text .= "\t" . 'index    index.php index.html index.htm;' . "\n";
-			$webroot_text .= "\t\t" . 'try_files $uri $uri/ @rewrites;' . "\n";
+			if ($domain['notryfiles'] != 1) {
+				$webroot_text .= "\t\t" . 'try_files $uri $uri/ @rewrites;' . "\n";
+			}
 		} else {
 			$webroot_text .= "\t" . 'index    index.html index.htm;' . "\n";
 		}
@@ -913,7 +929,7 @@ class nginx extends HttpConfigBase
 		}
 
 		$webroot_text .= "\t" . '}' . "\n\n";
-		if ($domain['phpenabled_customer'] == 1 && $domain['phpenabled_vhost'] == '1') {
+		if ($domain['phpenabled_customer'] == 1 && $domain['phpenabled_vhost'] == '1' && $domain['notryfiles'] != 1) {
 			$webroot_text .= "\tlocation @rewrites {\n";
 			$webroot_text .= "\t\trewrite ^ /index.php last;\n";
 			$webroot_text .= "\t}\n\n";
@@ -989,7 +1005,13 @@ class nginx extends HttpConfigBase
 		chown($access_log, Settings::Get('system.httpuser'));
 		chgrp($access_log, Settings::Get('system.httpgroup'));
 
-		$logfiles_text .= "\t" . 'access_log    ' . $access_log . ' combined;' . "\n";
+		$logtype = 'combined';
+		if (Settings::Get('system.logfiles_format') != '') {
+			$logtype = 'frx_custom';
+			$logfiles_text .= "\t" . 'log_format ' . $logtype . ' "' . Settings::Get('system.logfiles_format') . '";' . "\n";
+		}
+
+		$logfiles_text .= "\t" . 'access_log    ' . $access_log . ' ' . $logtype . ';' . "\n";
 		$logfiles_text .= "\t" . 'error_log    ' . $error_log . ' error;' . "\n";
 
 		if (Settings::Get('system.awstats_enabled') == '1') {

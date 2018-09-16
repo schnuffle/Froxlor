@@ -3633,3 +3633,368 @@ if (isDatabaseVersion('201705050')) {
 
 	updateToDbVersion('201708240');
 }
+
+if (isDatabaseVersion('201708240')) {
+	
+	showUpdateStep("Adding new 'disable LE self-check' setting");
+	$system_disable_le_selfcheck = isset($_POST['system_disable_le_selfcheck']) ? (int) $_POST['system_disable_le_selfcheck'] : 0;
+	Settings::AddNew('system.disable_le_selfcheck', $system_disable_le_selfcheck);
+	lastStepStatus(0);
+
+	updateToDbVersion('201712310');
+
+	showUpdateStep("Updating from 0.9.38.7 to 0.9.38.8", false);
+	updateToVersion('0.9.38.8');
+}
+
+if (isDatabaseVersion('201712310')) {
+
+	showUpdateStep("Adding field for fpm-daemon configs");
+	Database::query("ALTER TABLE `" . TABLE_PANEL_PHPCONFIGS . "` ADD `fpmsettingid` int(11) NOT NULL DEFAULT '1';");
+	lastStepStatus(0);
+
+	showUpdateStep("Adding new fpm-daemons table");
+	Database::query("DROP TABLE IF EXISTS `panel_fpmdaemons`;");
+	$sql = "CREATE TABLE `panel_fpmdaemons` (
+	  `id` int(11) unsigned NOT NULL auto_increment,
+	  `description` varchar(50) NOT NULL,
+	  `reload_cmd` varchar(255) NOT NULL,
+	  `config_dir` varchar(255) NOT NULL,
+	  `pm` varchar(15) NOT NULL DEFAULT 'static',
+	  `max_children` int(4) NOT NULL DEFAULT '1',
+	  `start_servers` int(4) NOT NULL DEFAULT '20',
+	  `min_spare_servers` int(4) NOT NULL DEFAULT '5',
+	  `max_spare_servers` int(4) NOT NULL DEFAULT '35',
+	  `max_requests` int(4) NOT NULL DEFAULT '0',
+	  `idle_timeout` int(4) NOT NULL DEFAULT '30',
+	  PRIMARY KEY  (`id`),
+	  UNIQUE KEY `reload` (`reload_cmd`),
+	  UNIQUE KEY `config` (`config_dir`)
+	) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;";
+	Database::query($sql);
+	lastStepStatus(0);
+
+	showUpdateStep("Converting php-fpm settings to new layout");
+	$ins_stmt = Database::prepare("
+		INSERT INTO `panel_fpmdaemons` SET
+		`id` = 1,
+		`description` = 'System default',
+		`reload_cmd` = :reloadcmd,
+		`config_dir` = :confdir,
+		`pm` = :pm,
+		`max_children` = :maxc,
+		`start_servers` = :starts,
+		`min_spare_servers` = :minss,
+		`max_spare_servers` = :maxss,
+		`max_requests` = :maxr,
+		`idle_timeout` = :it
+	");
+	Database::pexecute($ins_stmt, array(
+		'reloadcmd' => Settings::Get('phpfpm.reload'),
+		'confdir' => Settings::Get('phpfpm.configdir'),
+		'pm' => Settings::Get('phpfpm.pm'),
+		'maxc' => Settings::Get('phpfpm.max_children'),
+		'starts' => Settings::Get('phpfpm.start_servers'),
+		'minss' => Settings::Get('phpfpm.min_spare_servers'),
+		'maxss' => Settings::Get('phpfpm.max_spare_servers'),
+		'maxr' => Settings::Get('phpfpm.max_requests'),
+		'it' => Settings::Get('phpfpm.idle_timeout')
+	));
+	lastStepStatus(0);
+
+	showUpdateStep("Deleting unneeded settings");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'reload'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'configdir'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'pm'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'max_children'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'start_servers'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'min_spare_servers'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'max_spare_servers'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'max_requests'");
+	Database::query("DELETE FROM `".TABLE_PANEL_SETTINGS."` WHERE `settinggroup` = 'phpfpm' AND `varname` = 'idle_timeout'");
+	lastStepStatus(0);
+
+	updateToDbVersion('201801070');
+}
+
+if (isDatabaseVersion('201801070')) {
+
+	showUpdateStep("Adding field allowed_phpconfigs for customers");
+	Database::query("ALTER TABLE `" . TABLE_PANEL_CUSTOMERS . "` ADD `allowed_phpconfigs` varchar(500) NOT NULL default '';");
+	lastStepStatus(0);
+
+	updateToDbVersion('201801080');
+}
+
+if (isDatabaseVersion('201801080')) {
+
+	showUpdateStep("Adding new setting for Let's Encrypt ACME version");
+	Settings::AddNew('system.leapiversion', '1');
+	lastStepStatus(0);
+
+	updateToDbVersion('201801090');
+}
+
+if (isDatabaseVersion('201801090')) {
+
+	showUpdateStep("Adding field pass_authorizationheader for php-configs");
+	Database::query("ALTER TABLE `" . TABLE_PANEL_PHPCONFIGS . "` ADD `pass_authorizationheader` tinyint(1) NOT NULL default '0';");
+	lastStepStatus(0);
+
+	updateToDbVersion('201801091');
+}
+
+if (isDatabaseVersion('201801091')) {
+
+	showUpdateStep("Adding new setting for SSL protocols");
+	Settings::AddNew('system.ssl_protocols', 'TLSv1,TLSv1.2');
+	lastStepStatus(0);
+
+	updateToDbVersion('201801100');
+}
+
+if (isDatabaseVersion('201801100')) {
+
+	showUpdateStep("Adding field for security.limit_extensions fpm-setting");
+	Database::query("ALTER TABLE `" . TABLE_PANEL_FPMDAEMONS . "` ADD `limit_extensions` varchar(255) NOT NULL default '.php';");
+	lastStepStatus(0);
+
+	updateToDbVersion('201801101');
+}
+
+if (isDatabaseVersion('201801101')) {
+
+	showUpdateStep("Adding dynamic php-fpm php.ini settings");
+	Settings::AddNew('phpfpm.ini_flags', 'asp_tags
+display_errors
+display_startup_errors
+html_errors
+log_errors
+magic_quotes_gpc
+magic_quotes_runtime
+magic_quotes_sybase
+mail.add_x_header
+session.cookie_secure
+session.use_cookies
+short_open_tag
+track_errors
+xmlrpc_errors
+suhosin.simulation
+suhosin.session.encrypt
+suhosin.session.cryptua
+suhosin.session.cryptdocroot
+suhosin.cookie.encrypt
+suhosin.cookie.cryptua
+suhosin.cookie.cryptdocroot
+suhosin.executor.disable_eval
+mbstring.func_overload');
+	Settings::AddNew('phpfpm.ini_values', 'auto_append_file
+auto_prepend_file
+date.timezone
+default_charset
+error_reporting
+include_path
+log_errors_max_len
+mail.log
+max_execution_time
+session.cookie_domain
+session.cookie_lifetime
+session.cookie_path
+session.name
+session.serialize_handler
+upload_max_filesize
+xmlrpc_error_number
+session.auto_start
+always_populate_raw_post_data
+suhosin.session.cryptkey
+suhosin.session.cryptraddr
+suhosin.session.checkraddr
+suhosin.cookie.cryptkey
+suhosin.cookie.plainlist
+suhosin.cookie.cryptraddr
+suhosin.cookie.checkraddr
+suhosin.executor.func.blacklist
+suhosin.executor.eval.whitelist');
+	Settings::AddNew('phpfpm.ini_admin_flags', 'allow_call_time_pass_reference
+allow_url_fopen
+allow_url_include
+auto_detect_line_endings
+cgi.fix_pathinfo
+cgi.force_redirect
+enable_dl
+expose_php
+file_uploads
+ignore_repeated_errors
+ignore_repeated_source
+log_errors
+register_argc_argv
+report_memleaks
+opcache.enable
+opcache.consistency_checks
+opcache.dups_fix
+opcache.load_comments
+opcache.revalidate_path
+opcache.save_comments
+opcache.use_cwd
+opcache.validate_timestamps
+opcache.fast_shutdown');
+	Settings::AddNew('phpfpm.ini_admin_values', 'cgi.redirect_status_env
+date.timezone
+disable_classes
+disable_functions
+error_log
+gpc_order
+max_input_time
+max_input_vars
+memory_limit
+open_basedir
+output_buffering
+post_max_size
+precision
+sendmail_path
+session.gc_divisor
+session.gc_probability
+variables_order
+opcache.log_verbosity_level
+opcache.restrict_api
+opcache.revalidate_freq
+opcache.max_accelerated_files
+opcache.memory_consumption
+opcache.interned_strings_buffer');
+	lastStepStatus(0);
+
+	updateToDbVersion('201801110');
+}
+
+if (isDatabaseVersion('201801110')) {
+
+	showUpdateStep("Adding php-fpm php PATH setting for envrironment");
+	Settings::AddNew("phpfpm.envpath",  '/usr/local/bin:/usr/bin:/bin');
+	lastStepStatus(0);
+
+	updateToDbVersion('201801260');
+}
+
+if (isFroxlorVersion('0.9.38.8')) {
+
+	showUpdateStep("Updating from 0.9.38.8 to 0.9.39 final", false);
+	updateToVersion('0.9.39');
+}
+
+if (isFroxlorVersion('0.9.39')) {
+
+	showUpdateStep("Updating from 0.9.39 to 0.9.39.1", false);
+	updateToVersion('0.9.39.1');
+}
+
+if (isFroxlorVersion('0.9.39.1')) {
+
+	showUpdateStep("Updating from 0.9.39.1 to 0.9.39.2", false);
+	updateToVersion('0.9.39.2');
+}
+
+if (isDatabaseVersion('201801260')) {
+
+	showUpdateStep("Adding new plans table");
+	Database::query("DROP TABLE IF EXISTS `panel_plans`;");
+	$sql = "CREATE TABLE `panel_plans` (
+	  `id` int(11) NOT NULL auto_increment,
+	  `adminid` int(11) NOT NULL default '0',
+	  `name` varchar(255) NOT NULL default '',
+	  `description` text NOT NULL,
+	  `value` longtext NOT NULL,
+	  `ts` int(15) NOT NULL default '0',
+	  PRIMARY KEY  (id),
+	  KEY adminid (adminid)
+	) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;";
+	Database::query($sql);
+	lastStepStatus(0);
+
+	updateToDbVersion('201802120');
+}
+
+if (isDatabaseVersion('201802120')) {
+
+	showUpdateStep("Adding domain field for try_files flag");
+	Database::query("ALTER TABLE `" . TABLE_PANEL_DOMAINS . "` ADD `notryfiles` tinyint(1) DEFAULT '0';");
+	lastStepStatus(0);
+
+	updateToDbVersion('201802130');
+}
+
+if (isFroxlorVersion('0.9.39.2')) {
+
+	showUpdateStep("Updating from 0.9.39.2 to 0.9.39.3", false);
+	updateToVersion('0.9.39.3');
+}
+
+if (isFroxlorVersion('0.9.39.3')) {
+
+	showUpdateStep("Updating from 0.9.39.3 to 0.9.39.4", false);
+	updateToVersion('0.9.39.4');
+}
+
+if (isFroxlorVersion('0.9.39.4')) {
+
+	showUpdateStep("Updating from 0.9.39.4 to 0.9.39.5", false);
+	updateToVersion('0.9.39.5');
+}
+
+if (isDatabaseVersion('201802130')) {
+
+	showUpdateStep("Adding fullchain field to ssl certificates");
+	Database::query("ALTER TABLE `" . TABLE_PANEL_DOMAIN_SSL_SETTINGS . "` ADD `ssl_fullchain_file` mediumtext AFTER `ssl_csr_file`;");
+	lastStepStatus(0);
+
+	updateToDbVersion('201802250');
+}
+
+if (isDatabaseVersion('201802250')) {
+
+	showUpdateStep("Adding webserver logfile settings");
+	Settings::AddNew("system.logfiles_format",  '');
+	Settings::AddNew("system.logfiles_type",  '1');
+	Settings::AddNew("system.logfiles_piped",  '0');
+	lastStepStatus(0);
+
+	updateToDbVersion('201805240');
+}
+
+if (isDatabaseVersion('201805240')) {
+
+	showUpdateStep("Adding webserver logfile-script settings");
+	Settings::AddNew("system.logfiles_script",  '');
+	lastStepStatus(0);
+
+	updateToDbVersion('201805241');
+}
+
+if (isDatabaseVersion('201805241')) {
+
+	$do_update = true;
+	showUpdateStep("Checking for required PHP json-extension");
+	if (! extension_loaded('json')) {
+		$do_update = false;
+		lastStepStatus(2, 'not installed');
+	} else {
+		lastStepStatus(0);
+
+		showUpdateStep("Checking for current cronjobs that need converting");
+		$result_tasks_stmt = Database::query("
+			SELECT * FROM `" . TABLE_PANEL_TASKS . "` ORDER BY `id` ASC
+		");
+		$upd_stmt = Database::prepare("UPDATE `" . TABLE_PANEL_TASKS . "` SET `data` = :data WHERE `id` = :taskid");
+		while ($row = $result_tasks_stmt->fetch(PDO::FETCH_ASSOC)) {
+			if (! empty($row['data'])) {
+				$data = unserialize($row['data']);
+				Database::pexecute($upd_stmt, array(
+					'data' => json_encode($data),
+					'taskid' => $row['id']
+				));
+			}
+		}
+		lastStepStatus(0);
+
+		updateToDbVersion('201805290');
+	}
+}

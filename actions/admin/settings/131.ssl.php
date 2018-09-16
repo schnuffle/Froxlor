@@ -30,6 +30,20 @@ return array(
 					'save_method' => 'storeSettingField',
 					'overview_option' => true
 				),
+				'system_ssl_protocols' => array(
+					'label' => $lng['serversettings']['ssl']['ssl_protocols'],
+					'settinggroup' => 'system',
+					'varname' => 'ssl_protocols',
+					'type' => 'option',
+					'default' => 'TLSv1,TLSv1.2',
+					'option_mode' => 'multiple',
+					'option_options' => array(
+						'TLSv1' => 'TLSv1',
+						'TLSv1.1' => 'TLSv1.1',
+						'TLSv1.2' => 'TLSv1.2'
+					),
+					'save_method' => 'storeSettingField'
+				),
 				'system_ssl_cipher_list' => array(
 					'label' => $lng['serversettings']['ssl']['ssl_cipher_list'],
 					'settinggroup' => 'system',
@@ -87,8 +101,7 @@ return array(
 					'string_type' => 'string',
 					'string_emptyallowed' => false,
 					'default' => 'shmcb:/var/run/apache2/ocsp-stapling.cache(131072)',
-					'visible' => Settings::Get('system.webserver') == "apache2" &&
-							Settings::Get('system.apache24') == 1,
+					'visible' => Settings::Get('system.webserver') == "apache2" && Settings::Get('system.apache24') == 1,
 					'save_method' => 'storeSettingField'
 				),
 				'system_leenabled' => array(
@@ -107,7 +120,20 @@ return array(
 					'type' => 'string',
 					'string_type' => 'file',
 					'default' => '/etc/apache2/conf-enabled/acme.conf',
-					'save_method' => 'storeSettingField',
+					'save_method' => 'storeSettingField'
+				),
+				'system_leapiversion' => array(
+					'label' => $lng['serversettings']['leapiversion'],
+					'settinggroup' => 'system',
+					'varname' => 'leapiversion',
+					'type' => 'option',
+					'default' => '1',
+					'option_mode' => 'one',
+					'option_options' => array(
+						'1' => 'ACME v1',
+						'2' => 'ACME v2'
+					),
+					'save_method' => 'storeSettingField'
 				),
 				'system_letsencryptca' => array(
 					'label' => $lng['serversettings']['letsencryptca'],
@@ -117,8 +143,8 @@ return array(
 					'default' => 'testing',
 					'option_mode' => 'one',
 					'option_options' => array(
-						'testing' => 'https://acme-staging.api.letsencrypt.org (Test)',
-						'production' => 'https://acme-v01.api.letsencrypt.org (Live)'
+						'testing' => 'https://acme-staging' . (Settings::Get('system.leapiversion') == '2' ? '-v02' : '') . '.api.letsencrypt.org (Test)',
+						'production' => 'https://acme-v0' . Settings::Get('system.leapiversion') . '.api.letsencrypt.org (Live)'
 					),
 					'save_method' => 'storeSettingField'
 				),
@@ -162,6 +188,14 @@ return array(
 					'label' => $lng['serversettings']['letsencryptreuseold'],
 					'settinggroup' => 'system',
 					'varname' => 'letsencryptreuseold',
+					'type' => 'bool',
+					'default' => false,
+					'save_method' => 'storeSettingField'
+				),
+				'system_disable_le_selfcheck' => array(
+					'label' => $lng['serversettings']['disable_le_selfcheck'],
+					'settinggroup' => 'system',
+					'varname' => 'disable_le_selfcheck',
 					'type' => 'bool',
 					'default' => false,
 					'save_method' => 'storeSettingField'

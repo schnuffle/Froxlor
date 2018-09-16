@@ -215,6 +215,11 @@ return array(
 					'required_resources' => 'change_serversettings'
 				),
 				array(
+					'url' => 'admin_plans.php?page=overview',
+					'label' => $lng['admin']['plans']['plans'],
+					'required_resources' => 'customers'
+				),
+				array(
 					'url' => 'admin_settings.php?page=updatecounters',
 					'label' => $lng['admin']['updatecounters'],
 					'required_resources' => 'change_serversettings'
@@ -267,6 +272,12 @@ return array(
 					'label' => $lng['admin']['autoupdate'],
 					'required_resources' => 'change_serversettings',
 					'show_element' => extension_loaded('zip')
+				),
+				array(
+					'url' => 'admin_settings.php?page=wipecleartextmailpws',
+					'label' => $lng['admin']['wipecleartextmailpwd'],
+					'required_resources' => 'change_serversettings',
+					'show_element' => (Settings::Get('system.mailpwcleartext') == true)
 				)
 			)
 		),
@@ -278,6 +289,12 @@ return array(
 					'url' => 'admin_phpsettings.php?page=overview',
 					'label' => $lng['menue']['phpsettings']['maintitle'],
 					'show_element' => (Settings::Get('system.mod_fcgid') == true || Settings::Get('phpfpm.enabled') == true)
+				),
+				array(
+					'url' => 'admin_phpsettings.php?page=fpmdaemons',
+					'label' => $lng['menue']['phpsettings']['fpmdaemons'],
+					'required_resources' => 'change_serversettings',
+					'show_element' => Settings::Get('phpfpm.enabled') == true
 				),
 				array(
 					'url' => 'admin_settings.php?page=phpinfo',

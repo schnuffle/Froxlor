@@ -43,27 +43,27 @@ class DnsEntry
 	{
 		$_content = $this->content;
 		// check content length for txt records for bind9 (multiline)
-		if (Settings::Get('system.dns_server') != 'pdns' && $this->type == 'TXT' && strlen($_content) >= 64) {
+		if (Settings::Get('system.dns_server') != 'pdns' && $this->type == 'TXT' && strlen($_content) >= 255) {
 			// split string
-			$_contentlines = str_split($_content, 63);
+			$_contentlines = str_split($_content, 254);
 			// first line
 			$_l = array_shift($_contentlines);
 			// check for starting quote
 			if (substr($_l, 0, 1) == '"') {
 				$_l = substr($_l, 1);
 			}
-			$_content = '( "' . $_l . '"' . PHP_EOL;
+			$_content = '("' . $_l . '"' . PHP_EOL;
 			$_l = array_pop($_contentlines);
 			// check for ending quote
-			if (substr($_l, -1) == '"') {
-				$_l = substr($_l, 0, -1);
+			if (substr($_l, - 1) == '"') {
+				$_l = substr($_l, 0, - 1);
 			}
 			foreach ($_contentlines as $_cl) {
 				// lines in between
 				$_content .= "\t\t\t\t" . '"' . $_cl . '"' . PHP_EOL;
 			}
 			// last line
-			$_content .= "\t\t\t\t" . '"'.$_l.'" )';
+			$_content .= "\t\t\t\t" . '"' . $_l . '")';
 		}
 		$result = $this->record . "\t" . $this->ttl . "\t" . $this->class . "\t" . $this->type . "\t" . (($this->priority >= 0 && ($this->type == 'MX' || $this->type == 'SRV')) ? $this->priority . "\t" : "") . $_content . PHP_EOL;
 		return $result;

@@ -307,6 +307,8 @@ if ($page == 'customers'
 				Database::pexecute($stmt, array('id' => $id));
 				$stmt = Database::prepare("DELETE FROM `" . TABLE_PANEL_TRAFFIC . "` WHERE `customerid` = :id");
 				Database::pexecute($stmt, array('id' => $id));
+				$stmt = Database::prepare("DELETE FROM `" . TABLE_PANEL_DISKSPACE . "` WHERE `customerid` = :id");
+				Database::pexecute($stmt, array('id' => $id));
 				$stmt = Database::prepare("DELETE FROM `" . TABLE_MAIL_USERS . "` WHERE `customerid` = :id");
 				Database::pexecute($stmt, array('id' => $id));
 				$stmt = Database::prepare("DELETE FROM `" . TABLE_MAIL_VIRTUAL . "` WHERE `customerid` = :id");
@@ -532,6 +534,14 @@ if ($page == 'customers'
 					$phpenabled = intval($_POST['phpenabled']);
 				}
 
+				$allowed_phpconfigs = array();
+				if (isset($_POST['allowed_phpconfigs']) && is_array($_POST['allowed_phpconfigs'])) {
+					foreach ($_POST['allowed_phpconfigs'] as $allowed_phpconfig) {
+						$allowed_phpconfig = intval($allowed_phpconfig);
+						$allowed_phpconfigs[] = $allowed_phpconfig;
+					}
+				}
+
 				$perlenabled = 0;
 				if (isset($_POST['perlenabled'])) {
 					$perlenabled = intval($_POST['perlenabled']);
@@ -693,6 +703,7 @@ if ($page == 'customers'
 						'tickets' => $tickets,
 						'mysqls' => $mysqls,
 						'phpenabled' => $phpenabled,
+						'allowed_phpconfigs' => empty($allowed_phpconfigs) ? "" : json_encode($allowed_phpconfigs),
 						'imap' => $email_imap,
 						'pop3' => $email_pop3,
 						'perlenabled' => $perlenabled,
@@ -733,6 +744,7 @@ if ($page == 'customers'
 						`mysqls` = :mysqls,
 						`standardsubdomain` = '0',
 						`phpenabled` = :phpenabled,
+						`allowed_phpconfigs` = :allowed_phpconfigs,
 						`imap` = :imap,
 						`pop3` = :pop3,
 						`perlenabled` = :perlenabled,
@@ -1043,6 +1055,40 @@ if ($page == 'customers'
 				$gender_options .= makeoption($lng['gender']['male'], 1, null, true, true);
 				$gender_options .= makeoption($lng['gender']['female'], 2, null, true, true);
 
+				$phpconfigs = array();
+				$configs = Database::query("
+					SELECT c.*, fc.description as interpreter
+					FROM `" . TABLE_PANEL_PHPCONFIGS . "` c
+					LEFT JOIN `" . TABLE_PANEL_FPMDAEMONS . "` fc ON fc.id = c.fpmsettingid
+				");
+				while ($row = $configs->fetch(PDO::FETCH_ASSOC)) {
+					if ((int) Settings::Get('phpfpm.enabled') == 1) {
+						$phpconfigs[] = array(
+							'label' => $row['description'] . " [".$row['interpreter']."]<br />",
+							'value' => $row['id']
+						);
+					} else {
+						$phpconfigs[] = array(
+							'label' => $row['description']."<br />",
+							'value' => $row['id']
+						);
+					}
+				}
+
+				// hosting plans
+				$hosting_plans = "";
+				$plans = Database::query("
+					SELECT *
+					FROM `" . TABLE_PANEL_PLANS . "`
+					ORDER BY name ASC
+				");
+				if (Database::num_rows() > 0){
+					$hosting_plans .= makeoption("---", 0, 0, true, true);
+				}
+				while ($row = $plans->fetch(PDO::FETCH_ASSOC)) {
+					$hosting_plans .= makeoption($row['name'], $row['id'], 0, true, true);
+				}
+
 				$customer_add_data = include_once dirname(__FILE__).'/lib/formfields/admin/customer/formfield.customer_add.php';
 				$customer_add_form = htmlform::genHTMLForm($customer_add_data);
 
@@ -1203,6 +1249,14 @@ if ($page == 'customers'
 				$phpenabled = 0;
 				if (isset($_POST['phpenabled'])) {
 					$phpenabled = intval($_POST['phpenabled']);
+				}
+
+				$allowed_phpconfigs = array();
+				if (isset($_POST['allowed_phpconfigs']) && is_array($_POST['allowed_phpconfigs'])) {
+					foreach ($_POST['allowed_phpconfigs'] as $allowed_phpconfig) {
+						$allowed_phpconfig = intval($allowed_phpconfig);
+						$allowed_phpconfigs[] = $allowed_phpconfig;
+					}
 				}
 
 				$perlenabled = 0;
@@ -1457,6 +1511,7 @@ if ($page == 'customers'
 						'mysqls' => $mysqls,
 						'deactivated' => $deactivated,
 						'phpenabled' => $phpenabled,
+						'allowed_phpconfigs' => empty($allowed_phpconfigs) ? "" : json_encode($allowed_phpconfigs),
 						'imap' => $email_imap,
 						'pop3' => $email_pop3,
 						'perlenabled' => $perlenabled,
@@ -1490,6 +1545,7 @@ if ($page == 'customers'
 						`mysqls` = :mysqls,
 						`deactivated` = :deactivated,
 						`phpenabled` = :phpenabled,
+						`allowed_phpconfigs` = :allowed_phpconfigs,
 						`email_quota` = :email_quota,
 						`imap` = :imap,
 						`pop3` = :pop3,
@@ -1694,6 +1750,40 @@ if ($page == 'customers'
 				$gender_options = makeoption($lng['gender']['undef'], 0, ($result['gender'] == '0' ? true : false), true, true);
 				$gender_options .= makeoption($lng['gender']['male'], 1, ($result['gender'] == '1' ? true : false), true, true);
 				$gender_options .= makeoption($lng['gender']['female'], 2, ($result['gender'] == '2' ? true : false), true, true);
+
+				$phpconfigs = array();
+				$configs = Database::query("
+					SELECT c.*, fc.description as interpreter
+					FROM `" . TABLE_PANEL_PHPCONFIGS . "` c
+					LEFT JOIN `" . TABLE_PANEL_FPMDAEMONS . "` fc ON fc.id = c.fpmsettingid
+				");
+				while ($row = $configs->fetch(PDO::FETCH_ASSOC)) {
+					if ((int) Settings::Get('phpfpm.enabled') == 1) {
+						$phpconfigs[] = array(
+							'label' => $row['description'] . " [".$row['interpreter']."]<br />",
+							'value' => $row['id']
+						);
+					} else {
+						$phpconfigs[] = array(
+							'label' => $row['description']."<br />",
+							'value' => $row['id']
+						);
+					}
+				}
+
+				// hosting plans
+				$hosting_plans = "";
+				$plans = Database::query("
+					SELECT *
+					FROM `" . TABLE_PANEL_PLANS . "`
+					ORDER BY name ASC
+				");
+				if (Database::num_rows() > 0){
+					$hosting_plans .= makeoption("---", 0, 0, true, true);
+				}
+				while ($row = $plans->fetch(PDO::FETCH_ASSOC)) {
+					$hosting_plans .= makeoption($row['name'], $row['id'], 0, true, true);
+				}
 
 				$customer_edit_data = include_once dirname(__FILE__).'/lib/formfields/admin/customer/formfield.customer_edit.php';
 				$customer_edit_form = htmlform::genHTMLForm($customer_edit_data);

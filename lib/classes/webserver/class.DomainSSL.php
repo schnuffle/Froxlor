@@ -90,12 +90,11 @@ class DomainSSL {
 					$ssl_files['ssl_cert_chainfile'] = makeCorrectFile($sslcertpath.'/'.$domain['domain'].'_chain.pem');
 				}
 			}
-			
-                        // create fullchain needed for postfix and dovecot when chain and ca exist
-                        if (($dom_certs['ssl_ca_file'] != '') and ($dom_certs['ssl_cert_chainfile'] != '')) {
-                                 $dom_certs['ssl_cert_fullchainfile'] = trim($dom_certs['ssl_cert_file'])."\n".trim($dom_certs['ssl_cert_chainfile'])."\n".trim($dom_certs['ssl_ca_file'])."\n";
-                                 $ssl_files['ssl_cert_fullchainfile'] = makeCorrectFile($sslcertpath.'/'.$domain['domain'].'_fullchain.pem');
-                         }
+
+			// will only be generated to be used externally, froxlor does not need this
+			if ($dom_certs['ssl_fullchain_file'] != '') {
+				$ssl_files['ssl_fullchain_file'] = makeCorrectFile($sslcertpath.'/'.$domain['domain'].'_fullchain.pem');
+			}
 
 			// create them on the filesystem
 			foreach ($ssl_files as $type => $filename) {

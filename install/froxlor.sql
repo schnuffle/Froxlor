@@ -66,7 +66,7 @@ CREATE TABLE `mail_virtual` (
   `id` int(11) NOT NULL auto_increment,
   `email` varchar(255) NOT NULL default '',
   `email_full` varchar(255) NOT NULL default '',
-  `destination` text NOT NULL default '',
+  `destination` text,
   `domainid` int(11) NOT NULL default '0',
   `customerid` int(11) NOT NULL default '0',
   `popaccountid` int(11) NOT NULL default '0',
@@ -198,6 +198,7 @@ CREATE TABLE `panel_customers` (
   `lepublickey` mediumtext default NULL,
   `leprivatekey` mediumtext default NULL,
   `leregistered` tinyint(1) NOT NULL default '0',
+  `allowed_phpconfigs` varchar(500) NOT NULL default '',
    PRIMARY KEY  (`customerid`),
    UNIQUE KEY `loginname` (`loginname`)
 ) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
@@ -259,6 +260,7 @@ CREATE TABLE `panel_domains` (
   `hsts_preload` tinyint(1) NOT NULL default '0',
   `ocsp_stapling` tinyint(1) DEFAULT '0',
   `http2` tinyint(1) DEFAULT '0',
+  `notryfiles` tinyint(1) DEFAULT '0',
   PRIMARY KEY  (`id`),
   KEY `customerid` (`customerid`),
   KEY `parentdomain` (`parentdomainid`),
@@ -278,11 +280,11 @@ CREATE TABLE `panel_ipsandports` (
   `vhostcontainer_servername_statement` tinyint(1) NOT NULL default '0',
   `specialsettings` text,
   `ssl` tinyint(4) NOT NULL default '0',
-  `ssl_cert_file` varchar(255) NOT NULL,
-  `ssl_key_file` varchar(255) NOT NULL,
-  `ssl_ca_file` varchar(255) NOT NULL,
+  `ssl_cert_file` varchar(255) NOT NULL default '',
+  `ssl_key_file` varchar(255) NOT NULL default '',
+  `ssl_ca_file` varchar(255) NOT NULL default '',
   `default_vhostconf_domain` text,
-  `ssl_cert_chainfile` varchar(255) NOT NULL,
+  `ssl_cert_chainfile` varchar(255) NOT NULL default '',
   `docroot` varchar(255) NOT NULL default '',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `ip_port` (`ip`,`port`)
@@ -413,6 +415,7 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('phpfpm', 'max_requests', '0'),
 	('phpfpm', 'tmpdir', '/var/customers/tmp/'),
 	('phpfpm', 'peardir', '/usr/share/php/:/usr/share/php5/'),
+	('phpfpm', 'envpath', '/usr/local/bin:/usr/bin:/bin'),
 	('phpfpm', 'enabled_ownvhost', '0'),
 	('phpfpm', 'vhost_httpuser', 'froxlorlocal'),
 	('phpfpm', 'vhost_httpgroup', 'froxlorlocal'),
@@ -422,6 +425,102 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('phpfpm', 'vhost_defaultini', '2'),
 	('phpfpm', 'fastcgi_ipcdir', '/var/lib/apache2/fastcgi/'),
 	('phpfpm', 'use_mod_proxy', '0'),
+	('phpfpm', 'ini_flags', 'asp_tags
+display_errors
+display_startup_errors
+html_errors
+log_errors
+magic_quotes_gpc
+magic_quotes_runtime
+magic_quotes_sybase
+mail.add_x_header
+session.cookie_secure
+session.use_cookies
+short_open_tag
+track_errors
+xmlrpc_errors
+suhosin.simulation
+suhosin.session.encrypt
+suhosin.session.cryptua
+suhosin.session.cryptdocroot
+suhosin.cookie.encrypt
+suhosin.cookie.cryptua
+suhosin.cookie.cryptdocroot
+suhosin.executor.disable_eval
+mbstring.func_overload'),
+	('phpfpm', 'ini_values', 'auto_append_file
+auto_prepend_file
+date.timezone
+default_charset
+error_reporting
+include_path
+log_errors_max_len
+mail.log
+max_execution_time
+session.cookie_domain
+session.cookie_lifetime
+session.cookie_path
+session.name
+session.serialize_handler
+upload_max_filesize
+xmlrpc_error_number
+session.auto_start
+always_populate_raw_post_data
+suhosin.session.cryptkey
+suhosin.session.cryptraddr
+suhosin.session.checkraddr
+suhosin.cookie.cryptkey
+suhosin.cookie.plainlist
+suhosin.cookie.cryptraddr
+suhosin.cookie.checkraddr
+suhosin.executor.func.blacklist
+suhosin.executor.eval.whitelist'),
+	('phpfpm', 'ini_admin_flags', 'allow_call_time_pass_reference
+allow_url_fopen
+allow_url_include
+auto_detect_line_endings
+cgi.fix_pathinfo
+cgi.force_redirect
+enable_dl
+expose_php
+file_uploads
+ignore_repeated_errors
+ignore_repeated_source
+log_errors
+register_argc_argv
+report_memleaks
+opcache.enable
+opcache.consistency_checks
+opcache.dups_fix
+opcache.load_comments
+opcache.revalidate_path
+opcache.save_comments
+opcache.use_cwd
+opcache.validate_timestamps
+opcache.fast_shutdown'),
+	('phpfpm', 'ini_admin_values', 'cgi.redirect_status_env
+date.timezone
+disable_classes
+disable_functions
+error_log
+gpc_order
+max_input_time
+max_input_vars
+memory_limit
+open_basedir
+output_buffering
+post_max_size
+precision
+sendmail_path
+session.gc_divisor
+session.gc_probability
+variables_order
+opcache.log_verbosity_level
+opcache.restrict_api
+opcache.revalidate_freq
+opcache.max_accelerated_files
+opcache.memory_consumption
+opcache.interned_strings_buffer'),
 	('nginx', 'fastcgiparams', '/etc/nginx/fastcgi_params'),
 	('system', 'lastaccountnumber', '0'),
 	('system', 'lastguid', '9999'),
@@ -443,7 +542,7 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('system', 'defaultip', '1'),
 	('system', 'phpappendopenbasedir', '/tmp/'),
 	('system', 'deactivateddocroot', ''),
-	('system', 'mailpwcleartext', '1'),
+	('system', 'mailpwcleartext', '0'),
 	('system', 'last_tasks_run', '000000'),
 	('system', 'nameservers', ''),
 	('system', 'mxservers', ''),
@@ -504,7 +603,7 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('system', 'http2_support', '0'),
 	('system', 'perl_server', 'unix:/var/run/nginx/cgiwrap-dispatch.sock'),
 	('system', 'phpreload_command', ''),
-	('system', 'apache24', '0'),
+	('system', 'apache24', '1'),
 	('system', 'apache24_ocsp_cache_path', 'shmcb:/var/run/apache2/ocsp-stapling.cache(131072)'),
 	('system', 'documentroot_use_default_value', '0'),
 	('system', 'passwordcryptfunc', '3'),
@@ -533,6 +632,7 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('system', 'letsencryptkeysize', '4096'),
 	('system', 'letsencryptreuseold', 0),
 	('system', 'leenabled', '0'),
+	('system', 'leapiversion', '1'),
 	('system', 'backupenabled', '0'),
 	('system', 'dnsenabled', '0'),
 	('system', 'dns_server', 'bind'),
@@ -554,6 +654,12 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('system', 'hsts_preload', '0'),
 	('system', 'leregistered', '0'),
 	('system', 'nssextrausers', '0'),
+	('system', 'disable_le_selfcheck', '0'),
+	('system', 'ssl_protocols', 'TLSv1,TLSv1.2'),
+	('system', 'logfiles_format', ''),
+	('system', 'logfiles_type', '1'),
+	('system', 'logfiles_piped', '0'),
+	('system', 'logfiles_script', ''),
 	('panel', 'decimal_places', '4'),
 	('panel', 'adminmail', 'admin@SERVERNAME'),
 	('panel', 'phpmyadmin_url', ''),
@@ -585,8 +691,8 @@ INSERT INTO `panel_settings` (`settinggroup`, `varname`, `value`) VALUES
 	('panel', 'password_special_char_required', '0'),
 	('panel', 'password_special_char', '!?<>§$%+#=@'),
 	('panel', 'customer_hide_options', ''),
-	('panel', 'version', '0.9.38.7'),
-	('panel', 'db_version', '201708240');
+	('panel', 'version', '0.9.39.5'),
+	('panel', 'db_version', '201805290');
 
 
 DROP TABLE IF EXISTS `panel_tasks`;
@@ -752,6 +858,33 @@ CREATE TABLE IF NOT EXISTS `panel_syslog` (
 ) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
 
 
+
+DROP TABLE IF EXISTS `panel_fpmdaemons`;
+CREATE TABLE `panel_fpmdaemons` (
+  `id` int(11) unsigned NOT NULL auto_increment,
+  `description` varchar(50) NOT NULL,
+  `reload_cmd` varchar(255) NOT NULL,
+  `config_dir` varchar(255) NOT NULL,
+  `pm` varchar(15) NOT NULL DEFAULT 'static',
+  `max_children` int(4) NOT NULL DEFAULT '1',
+  `start_servers` int(4) NOT NULL DEFAULT '20',
+  `min_spare_servers` int(4) NOT NULL DEFAULT '5',
+  `max_spare_servers` int(4) NOT NULL DEFAULT '35',
+  `max_requests` int(4) NOT NULL DEFAULT '0',
+  `idle_timeout` int(4) NOT NULL DEFAULT '30',
+  `limit_extensions` varchar(255) NOT NULL default '.php',
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `reload` (`reload_cmd`),
+  UNIQUE KEY `config` (`config_dir`)
+) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
+
+
+
+INSERT INTO `panel_fpmdaemons` (`id`, `description`, `reload_cmd`, `config_dir`) VALUES
+(1, 'System default', 'service php7.0-fpm restart', '/etc/php/7.0/fpm/pool.d/');
+
+
+
 DROP TABLE IF EXISTS `panel_phpconfigs`;
 CREATE TABLE `panel_phpconfigs` (
   `id` int(11) unsigned NOT NULL auto_increment,
@@ -765,7 +898,10 @@ CREATE TABLE `panel_phpconfigs` (
   `fpm_reqterm` varchar(15) NOT NULL default '60s',
   `fpm_reqslow` varchar(15) NOT NULL default '5s',
   `phpsettings` text NOT NULL,
-  PRIMARY KEY  (`id`)
+  `fpmsettingid` int(11) NOT NULL DEFAULT '1',
+  `pass_authorizationheader` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`id`),
+  KEY `fpmsettingid` (`fpmsettingid`)
 ) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
 
 
@@ -867,11 +1003,12 @@ DROP TABLE IF EXISTS `domain_ssl_settings`;
 CREATE TABLE IF NOT EXISTS `domain_ssl_settings` (
   `id` int(5) NOT NULL auto_increment,
   `domainid` int(11) NOT NULL,
-  `ssl_cert_file` mediumtext NOT NULL,
-  `ssl_key_file` mediumtext NOT NULL,
+  `ssl_cert_file` mediumtext,
+  `ssl_key_file` mediumtext,
   `ssl_ca_file` mediumtext,
   `ssl_cert_chainfile` mediumtext,
   `ssl_csr_file` mediumtext,
+  `ssl_fullchain_file` mediumtext,
   `expirationdate` datetime DEFAULT NULL,
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
@@ -895,5 +1032,18 @@ CREATE TABLE `domain_dns_entries` (
   `ttl` int(11) NOT NULL DEFAULT '18000',
   `prio` int(11) DEFAULT NULL,
   PRIMARY KEY  (`id`)
+) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
+
+
+DROP TABLE IF EXISTS `panel_plans`;
+CREATE TABLE `panel_plans` (
+  `id` int(11) NOT NULL auto_increment,
+  `adminid` int(11) NOT NULL default '0',
+  `name` varchar(255) NOT NULL default '',
+  `description` text NOT NULL,
+  `value` longtext NOT NULL,
+  `ts` int(15) NOT NULL default '0',
+  PRIMARY KEY  (id),
+  KEY adminid (adminid)
 ) ENGINE=MyISAM CHARSET=utf8 COLLATE=utf8_general_ci;
 

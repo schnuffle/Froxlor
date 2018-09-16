@@ -55,7 +55,7 @@ if ($page == 'domains' || $page == 'overview') {
 			$syshostname = "AND `d`.`id` <> " . Settings::Get('system.hostname_id');
 		}
 		$result_stmt = Database::prepare("
-			SELECT `d`.*, `c`.`loginname`, `c`.`name`, `c`.`firstname`, `c`.`company`, `c`.`standardsubdomain`, `ad`.`id` AS `aliasdomainid`, `ad`.`domain` AS `aliasdomain`
+			SELECT `d`.*, `c`.`loginname`, `c`.`deactivated`, `c`.`name`, `c`.`firstname`, `c`.`company`, `c`.`standardsubdomain`, `ad`.`id` AS `aliasdomainid`, `ad`.`domain` AS `aliasdomain`
 			FROM `" . TABLE_PANEL_DOMAINS . "` `d`
 			LEFT JOIN `" . TABLE_PANEL_CUSTOMERS . "` `c` USING(`customerid`)
 			LEFT JOIN `" . TABLE_PANEL_DOMAINS . "` `ad` ON `d`.`aliasdomain`=`ad`.`id`
@@ -429,6 +429,7 @@ if ($page == 'domains' || $page == 'overview') {
 					}
 
 					$specialsettings = validate(str_replace("\r\n", "\n", $_POST['specialsettings']), 'specialsettings', '/^[^\0]*$/');
+					$notryfiles = isset($_POST['notryfiles']) && (int)$_POST['notryfiles'] == 1 ? 1 : 0;
 					validate($_POST['documentroot'], 'documentroot');
 
 					// If path is empty and 'Use domain name as default value for DocumentRoot path' is enabled in settings,
@@ -451,6 +452,7 @@ if ($page == 'domains' || $page == 'overview') {
 					$zonefile = '';
 					$dkim = '1';
 					$specialsettings = '';
+					$notryfiles = '0';
 				}
 
 				if ($userinfo['caneditphpsettings'] == '1' || $userinfo['change_serversettings'] == '1') {
@@ -526,7 +528,7 @@ if ($page == 'domains' || $page == 'overview') {
 
 				$ipandports = array();
 				if (isset($_POST['ipandport']) && ! is_array($_POST['ipandport'])) {
-					$_POST['ipandport'] = unserialize($_POST['ipandport']);
+					$_POST['ipandport'] = json_decode($_POST['ipandport'], true);
 				}
 
 				if (isset($_POST['ipandport']) && is_array($_POST['ipandport'])) {
@@ -562,7 +564,7 @@ if ($page == 'domains' || $page == 'overview') {
 
 					$ssl_ipandports = array();
 					if (isset($_POST['ssl_ipandport']) && ! is_array($_POST['ssl_ipandport'])) {
-						$_POST['ssl_ipandport'] = unserialize($_POST['ssl_ipandport']);
+						$_POST['ssl_ipandport'] = json_decode($_POST['ssl_ipandport'], true);
 					}
 
 					// Verify SSL-Ports
@@ -604,7 +606,7 @@ if ($page == 'domains' || $page == 'overview') {
 						$ssl_redirect = 0;
 						$letsencrypt = 0;
 						$http2 = 0;
-						// we need this for the serialize
+						// we need this for the json-encode
 						// if ssl is disabled or no ssl-ip/port exists
 						$ssl_ipandports[] = - 1;
 
@@ -620,7 +622,7 @@ if ($page == 'domains' || $page == 'overview') {
 					$ssl_redirect = 0;
 					$letsencrypt = 0;
 					$http2 = 0;
-					// we need this for the serialize
+					// we need this for the json-encode
 					// if ssl is disabled or no ssl-ip/port exists
 					$ssl_ipandports[] = - 1;
 
@@ -633,9 +635,14 @@ if ($page == 'domains' || $page == 'overview') {
 					$ocsp_stapling = 0;
 				}
 
-				// We can't enable let's encrypt for wildcard - domains
-				if ($serveraliasoption == '0' && $letsencrypt == '1') {
+				// We can't enable let's encrypt for wildcard - domains if using acme-v1
+				if ($serveraliasoption == '0' && $letsencrypt == '1' && Settings::Get('system.leapiversion') == '1') {
 					standard_error('nowildcardwithletsencrypt');
+				}
+				// if using acme-v2 we cannot issue wildcard-certificates
+				// because they currently only support the dns-01 challenge
+				if ($serveraliasoption == '0' && $letsencrypt == '1' && Settings::Get('system.leapiversion') == '2') {
+					standard_error('nowildcardwithletsencryptv2');
 				}
 
 				// Temporarily deactivate ssl_redirect until Let's Encrypt certificate was generated
@@ -685,7 +692,7 @@ if ($page == 'domains' || $page == 'overview') {
 					}
 
 					if (count($ssl_ipandports) == 0) {
-						// we need this for the serialize
+						// we need this for the json-encode
 						// if ssl is disabled or no ssl-ip/port exists
 						$ssl_ipandports[] = - 1;
 					}
@@ -787,15 +794,16 @@ if ($page == 'domains' || $page == 'overview') {
 						'dkim' => $dkim,
 						'speciallogfile' => $speciallogfile,
 						'selectserveralias' => $serveraliasoption,
-						'ipandport' => serialize($ipandports),
+						'ipandport' => json_encode($ipandports),
 						'ssl_redirect' => $ssl_redirect,
-						'ssl_ipandport' => serialize($ssl_ipandports),
+						'ssl_ipandport' => json_encode($ssl_ipandports),
 						'phpenabled' => $phpenabled,
 						'openbasedir' => $openbasedir,
 						'phpsettingid' => $phpsettingid,
 						'mod_fcgid_starter' => $mod_fcgid_starter,
 						'mod_fcgid_maxrequests' => $mod_fcgid_maxrequests,
 						'specialsettings' => $specialsettings,
+						'notryfiles' => $notryfiles,
 						'registration_date' => $registration_date,
 						'termination_date' => $termination_date,
 						'issubof' => $issubof,
@@ -845,6 +853,7 @@ if ($page == 'domains' || $page == 'overview') {
 						'openbasedir' => $openbasedir,
 						'speciallogfile' => $speciallogfile,
 						'specialsettings' => $specialsettings,
+						'notryfiles' => $notryfiles,
 						'ssl_redirect' => $ssl_redirect,
 						'add_date' => time(),
 						'registration_date' => $registration_date,
@@ -884,6 +893,7 @@ if ($page == 'domains' || $page == 'overview') {
 						`openbasedir` = :openbasedir,
 						`speciallogfile` = :speciallogfile,
 						`specialsettings` = :specialsettings,
+						`notryfiles` = :notryfiles,
 						`ssl_redirect` = :ssl_redirect,
 						`add_date` = :add_date,
 						`registration_date` = :registration_date,
@@ -1077,11 +1087,15 @@ if ($page == 'domains' || $page == 'overview') {
 				}
 
 				$phpconfigs = '';
-				$configs = Database::query("SELECT * FROM `" . TABLE_PANEL_PHPCONFIGS . "`");
+				$configs = Database::query("
+					SELECT c.*, fc.description as interpreter
+					FROM `" . TABLE_PANEL_PHPCONFIGS . "` c
+					LEFT JOIN `" . TABLE_PANEL_FPMDAEMONS . "` fc ON fc.id = c.fpmsettingid
+				");
 
 				while ($row = $configs->fetch(PDO::FETCH_ASSOC)) {
 					if ((int) Settings::Get('phpfpm.enabled') == 1) {
-						$phpconfigs .= makeoption($row['description'], $row['id'], Settings::Get('phpfpm.defaultini'), true, true);
+						$phpconfigs .= makeoption($row['description'] . " [".$row['interpreter']."]", $row['id'], Settings::Get('phpfpm.defaultini'), true, true);
 					} else {
 						$phpconfigs .= makeoption($row['description'], $row['id'], Settings::Get('system.mod_fcgid_defaultini'), true, true);
 					}
@@ -1110,7 +1124,6 @@ if ($page == 'domains' || $page == 'overview') {
 			}
 		}
 	} elseif ($action == 'edit' && $id != 0) {
-
 		$result_stmt = Database::prepare("
 			SELECT `d`.*, `c`.`customerid`
 			FROM `" . TABLE_PANEL_DOMAINS . "` `d`
@@ -1329,6 +1342,7 @@ if ($page == 'domains' || $page == 'overview') {
 
 					$specialsettings = validate(str_replace("\r\n", "\n", $_POST['specialsettings']), 'specialsettings', '/^[^\0]*$/');
 					$ssfs = (isset($_POST['specialsettingsforsubdomains']) && intval($_POST['specialsettingsforsubdomains']) == 1) ? 1 : 0;
+					$notryfiles = isset($_POST['notryfiles']) && (int)$_POST['notryfiles'] == 1 ? 1 : 0;
 					$documentroot = validate($_POST['documentroot'], 'documentroot');
 
 					if ($documentroot == '') {
@@ -1350,6 +1364,7 @@ if ($page == 'domains' || $page == 'overview') {
 					$dkim = $result['dkim'];
 					$specialsettings = $result['specialsettings'];
 					$ssfs = (empty($specialsettings) ? 0 : 1);
+					$notryfiles = $result['notryfiles'];
 					$documentroot = $result['documentroot'];
 				}
 
@@ -1359,6 +1374,7 @@ if ($page == 'domains' || $page == 'overview') {
 
 					$phpenabled  = isset($_POST['phpenabled']) ? intval($_POST['phpenabled']) : 0;
 					$openbasedir = isset($_POST['openbasedir']) ? intval($_POST['openbasedir']) : 0;
+					$phpfs = (isset($_POST['phpsettingsforsubdomains']) && intval($_POST['phpsettingsforsubdomains']) == 1) ? 1 : 0;
 
 					if ((int) Settings::Get('system.mod_fcgid') == 1 || (int) Settings::Get('phpfpm.enabled') == 1) {
 						$phpsettingid = (int) $_POST['phpsettingid'];
@@ -1388,6 +1404,7 @@ if ($page == 'domains' || $page == 'overview') {
 						}
 					} else {
 						$phpsettingid = $result['phpsettingid'];
+						$phpfs = 1;
 						$mod_fcgid_starter = $result['mod_fcgid_starter'];
 						$mod_fcgid_maxrequests = $result['mod_fcgid_maxrequests'];
 					}
@@ -1395,13 +1412,14 @@ if ($page == 'domains' || $page == 'overview') {
 					$phpenabled = $result['phpenabled'];
 					$openbasedir = $result['openbasedir'];
 					$phpsettingid = $result['phpsettingid'];
+					$phpfs = 1;
 					$mod_fcgid_starter = $result['mod_fcgid_starter'];
 					$mod_fcgid_maxrequests = $result['mod_fcgid_maxrequests'];
 				}
 
 				$ipandports = array();
 				if (isset($_POST['ipandport']) && ! is_array($_POST['ipandport'])) {
-					$_POST['ipandport'] = unserialize($_POST['ipandport']);
+					$_POST['ipandport'] = json_decode($_POST['ipandport'], true);
 				}
 				if (isset($_POST['ipandport']) && is_array($_POST['ipandport'])) {
 
@@ -1447,7 +1465,7 @@ if ($page == 'domains' || $page == 'overview') {
 
 					$ssl_ipandports = array();
 					if (isset($_POST['ssl_ipandport']) && ! is_array($_POST['ssl_ipandport'])) {
-						$_POST['ssl_ipandport'] = unserialize($_POST['ssl_ipandport']);
+						$_POST['ssl_ipandport'] = json_decode($_POST['ssl_ipandport'], true);
 					}
 					if (isset($_POST['ssl_ipandport']) && is_array($_POST['ssl_ipandport'])) {
 
@@ -1475,7 +1493,7 @@ if ($page == 'domains' || $page == 'overview') {
 						$ssl_redirect = 0;
 						$letsencrypt = 0;
 						$http2 = 0;
-						// we need this for the serialize
+						// we need this for the json-encode
 						// if ssl is disabled or no ssl-ip/port exists
 						$ssl_ipandports[] = - 1;
 
@@ -1491,7 +1509,7 @@ if ($page == 'domains' || $page == 'overview') {
 					$ssl_redirect = 0;
 					$letsencrypt = 0;
 					$http2 = 0;
-					// we need this for the serialize
+					// we need this for the json-encode
 					// if ssl is disabled or no ssl-ip/port exists
 					$ssl_ipandports[] = - 1;
 
@@ -1504,9 +1522,14 @@ if ($page == 'domains' || $page == 'overview') {
 					$ocsp_stapling = 0;
 				}
 
-				// We can't enable let's encrypt for wildcard domains
-				if ($serveraliasoption == '0' && $letsencrypt == '1') {
+				// We can't enable let's encrypt for wildcard domains when using acme-v1
+				if ($serveraliasoption == '0' && $letsencrypt == '1' && Settings::Get('system.leapiversion') == '1') {
 					standard_error('nowildcardwithletsencrypt');
+				}
+				// if using acme-v2 we cannot issue wildcard-certificates
+				// because they currently only support the dns-01 challenge
+				if ($serveraliasoption == '0' && $letsencrypt == '1' && Settings::Get('system.leapiversion') == '2') {
+					standard_error('nowildcardwithletsencryptv2');
 				}
 
 				// Temporarily deactivate ssl_redirect until Let's Encrypt certificate was generated
@@ -1579,7 +1602,7 @@ if ($page == 'domains' || $page == 'overview') {
 					}
 
 					if (count($ssl_ipandports) == 0) {
-						// we need this for the serialize
+						// we need this for the json-encode
 						// if ssl is disabled or no ssl-ip/port exists
 						$ssl_ipandports[] = - 1;
 					}
@@ -1633,17 +1656,19 @@ if ($page == 'domains' || $page == 'overview') {
 					'phpenabled' => $phpenabled,
 					'openbasedir' => $openbasedir,
 					'phpsettingid' => $phpsettingid,
+					'phpsettingsforsubdomains' => $phpfs,
 					'mod_fcgid_starter' => $mod_fcgid_starter,
 					'mod_fcgid_maxrequests' => $mod_fcgid_maxrequests,
 					'specialsettings' => $specialsettings,
 					'specialsettingsforsubdomains' => $ssfs,
+					'notryfiles' => $notryfiles,
 					'registration_date' => $registration_date,
 					'termination_date' => $termination_date,
 					'issubof' => $issubof,
 					'speciallogfile' => $speciallogfile,
 					'speciallogverified' => $speciallogverified,
-					'ipandport' => serialize($ipandports),
-					'ssl_ipandport' => serialize($ssl_ipandports),
+					'ipandport' => json_encode($ipandports),
+					'ssl_ipandport' => json_encode($ssl_ipandports),
 					'letsencrypt' => $letsencrypt,
 					'http2' => $http2,
 					'hsts_maxage' => $hsts_maxage,
@@ -1679,6 +1704,7 @@ if ($page == 'domains' || $page == 'overview') {
 					$mod_fcgid_starter != $result['mod_fcgid_starter'] ||
 					$mod_fcgid_maxrequests != $result['mod_fcgid_maxrequests'] ||
 					$specialsettings != $result['specialsettings'] ||
+					$notryfiles != $result['notryfiles'] ||
 					$aliasdomain != $result['aliasdomain'] ||
 					$issubof != $result['ismainbutsubto'] ||
 					$email_only != $result['email_only'] ||
@@ -1837,6 +1863,7 @@ if ($page == 'domains' || $page == 'overview') {
 				$update_data['mod_fcgid_starter'] = $mod_fcgid_starter;
 				$update_data['mod_fcgid_maxrequests'] = $mod_fcgid_maxrequests;
 				$update_data['specialsettings'] = $specialsettings;
+				$update_data['notryfiles'] = $notryfiles;
 				$update_data['registration_date'] = $registration_date;
 				$update_data['termination_date'] = $termination_date;
 				$update_data['ismainbutsubto'] = $issubof;
@@ -1871,6 +1898,7 @@ if ($page == 'domains' || $page == 'overview') {
 					`mod_fcgid_starter` = :mod_fcgid_starter,
 					`mod_fcgid_maxrequests` = :mod_fcgid_maxrequests,
 					`specialsettings` = :specialsettings,
+					`notryfiles` = :notryfiles,
 					`registration_date` = :registration_date,
 					`termination_date` = :termination_date,
 					`ismainbutsubto` = :ismainbutsubto,
@@ -1888,10 +1916,17 @@ if ($page == 'domains' || $page == 'overview') {
 				$_update_data['adminid'] = $adminid;
 				$_update_data['phpenabled'] = $phpenabled;
 				$_update_data['openbasedir'] = $openbasedir;
-				$_update_data['phpsettingid'] = $phpsettingid;
 				$_update_data['mod_fcgid_starter'] = $mod_fcgid_starter;
 				$_update_data['mod_fcgid_maxrequests'] = $mod_fcgid_maxrequests;
 				$_update_data['parentdomainid'] = $id;
+
+				// if php config is to be set for all subdomains, check here
+				$update_phpconfig = '';
+				$phpfs = isset($_POST['phpsettingsforsubdomains']) ? 1 : 0;
+				if ($phpfs == 1) {
+					$_update_data['phpsettingid'] = $phpsettingid;
+					$update_phpconfig = ", `phpsettingid` = :phpsettingid";
+				}
 
 				// if we have no more ssl-ip's for this domain,
 				// all its subdomains must have "ssl-redirect = 0"
@@ -1907,10 +1942,9 @@ if ($page == 'domains' || $page == 'overview') {
 					`adminid` = :adminid,
 					`phpenabled` = :phpenabled,
 					`openbasedir` = :openbasedir,
-					`phpsettingid` = :phpsettingid,
 					`mod_fcgid_starter` = :mod_fcgid_starter,
 					`mod_fcgid_maxrequests` = :mod_fcgid_maxrequests
-					" . $upd_specialsettings . $updatechildren . $update_sslredirect . "
+					" . $update_phpconfig . $upd_specialsettings . $updatechildren . $update_sslredirect . "
 					WHERE `parentdomainid` = :parentdomainid
 				");
 				Database::pexecute($_update_stmt, $_update_data);
@@ -1993,7 +2027,15 @@ if ($page == 'domains' || $page == 'overview') {
 				} else
 					if ($result['wwwserveralias'] != $wwwserveralias || $result['letsencrypt'] != $letsencrypt) {
 						// or when wwwserveralias or letsencrypt was changed
+
 						triggerLetsEncryptCSRForAliasDestinationDomain($aliasdomain, $log);
+
+						if ($aliasdomain === 0) {
+							// in case the wwwserveralias is set on a main domain, $aliasdomain is 0
+							// --> the call just above to triggerLetsEncryptCSRForAliasDestinationDomain
+							//     is a noop...let's repeat it with the domain id of the main domain
+							triggerLetsEncryptCSRForAliasDestinationDomain($id, $log);
+						}
 					}
 
 				$log->logAction(ADM_ACTION, LOG_INFO, "edited domain #" . $id);
@@ -2180,10 +2222,25 @@ if ($page == 'domains' || $page == 'overview') {
 				$result['add_date'] = date('Y-m-d', $result['add_date']);
 
 				$phpconfigs = '';
-				$phpconfigs_result_stmt = Database::query("SELECT * FROM `" . TABLE_PANEL_PHPCONFIGS . "`");
+				$phpconfigs_result_stmt = Database::query("
+					SELECT c.*, fc.description as interpreter
+					FROM `" . TABLE_PANEL_PHPCONFIGS . "` c
+					LEFT JOIN `" . TABLE_PANEL_FPMDAEMONS . "` fc ON fc.id = c.fpmsettingid
+				");
+				$c_allowed_configs = getCustomerDetail($result['customerid'], 'allowed_phpconfigs');
+				if (!empty($c_allowed_configs)) {
+					$c_allowed_configs = json_decode($c_allowed_configs, true);
+				} else {
+					$c_allowed_configs = array();
+				}
 
 				while ($phpconfigs_row = $phpconfigs_result_stmt->fetch(PDO::FETCH_ASSOC)) {
-					$phpconfigs .= makeoption($phpconfigs_row['description'], $phpconfigs_row['id'], $result['phpsettingid'], true, true);
+					$disabled = !empty($c_allowed_configs) && !in_array($phpconfigs_row['id'], $c_allowed_configs);
+					if ((int) Settings::Get('phpfpm.enabled') == 1) {
+						$phpconfigs .= makeoption($phpconfigs_row['description'] . " [".$phpconfigs_row['interpreter']."]", $phpconfigs_row['id'], $result['phpsettingid'], true, true, null, $disabled);
+					} else {
+						$phpconfigs .= makeoption($phpconfigs_row['description'], $phpconfigs_row['id'], $result['phpsettingid'], true, true, null, $disabled);
+					}
 				}
 
 				$result = htmlentities_array($result);
@@ -2199,6 +2256,13 @@ if ($page == 'domains' || $page == 'overview') {
 				eval("echo \"" . getTemplate("domains/domains_edit") . "\";");
 			}
 		}
+	} elseif ($action == 'jqGetCustomerPHPConfigs') {
+
+		$customerid = intval($_POST['customerid']);
+		$allowed_phpconfigs = getCustomerDetail($customerid, 'allowed_phpconfigs');
+		echo !empty($allowed_phpconfigs) ? $allowed_phpconfigs : json_encode(array());
+		exit;
+
 	} elseif ($action == 'import') {
 
 		if (isset($_POST['send']) && $_POST['send'] == 'send') {

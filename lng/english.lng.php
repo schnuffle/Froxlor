@@ -337,6 +337,14 @@ $lng['serversettings']['documentroot_prefix']['title'] = 'Home directory';
 $lng['serversettings']['documentroot_prefix']['description'] = 'Where should all home directories be stored?';
 $lng['serversettings']['logfiles_directory']['title'] = 'Logfiles directory';
 $lng['serversettings']['logfiles_directory']['description'] = 'Where should all log files be stored?';
+$lng['serversettings']['logfiles_script']['title'] = 'Custom script to pipe log-files to';
+$lng['serversettings']['logfiles_script']['description'] = 'You can specify a script here and use the placeholders <strong>{LOGFILE}, {DOMAIN} and {CUSTOMER}</strong> if needed. In case you want to use it you will need to activate the <strong>Pipe webserver logfiles</strong> option too. No prefixed pipe-character is needed.';
+$lng['serversettings']['logfiles_format']['title'] = 'Access-log format';
+$lng['serversettings']['logfiles_format']['description'] = 'Enter a custom log-format here according to your webservers specifications, leave empty for default';
+$lng['serversettings']['logfiles_type']['title'] = 'Access-log type';
+$lng['serversettings']['logfiles_type']['description'] = 'Chose between <strong>combined</strong> or <strong>vhost_combined</strong> here.';
+$lng['serversettings']['logfiles_piped']['title'] = 'Pipe webserver logfiles to specified script (see above)';
+$lng['serversettings']['logfiles_piped']['description'] = 'When using a custom script for the logfiles you need to activate this in order for it to be executed';
 $lng['serversettings']['ipaddress']['title'] = 'IP-address';
 $lng['serversettings']['ipaddress']['description'] = 'What\'s the main IP-address of this server?';
 $lng['serversettings']['hostname']['title'] = 'Hostname';
@@ -508,8 +516,8 @@ $lng['changepassword']['also_change_webalizer'] = ' also change password for the
 
 $lng['serversettings']['mailpwcleartext']['title'] = 'Also save passwords of mail accounts unencrypted in database';
 $lng['serversettings']['mailpwcleartext']['description'] = 'If this is set to yes, all passwords will also be saved unencrypted (clear text, plain readable for everyone with database access) in the mail_users-table. Only activate this if you intend to use SASL!';
-$lng['serversettings']['mailpwcleartext']['removelink'] = 'Click here to wipe all unencrypted passwords from the table.';
-$lng['question']['admin_cleartextmailpws_reallywipe'] = 'Do you really want to wipe all unencrypted mail account passwords from the table mail_users? This cannot be reverted!';
+$lng['admin']['wipecleartextmailpwd'] = 'Clear plaintext passwords';
+$lng['question']['admin_cleartextmailpws_reallywipe'] = 'Do you really want to wipe all unencrypted mail account passwords from the table mail_users? This cannot be reverted! The setting to store email passwords unencrypted will also be set to OFF';
 $lng['admin']['configfiles']['overview'] = 'Overview';
 $lng['admin']['configfiles']['wizard'] = 'Wizard';
 $lng['admin']['configfiles']['distribution'] = 'Distribution';
@@ -940,6 +948,7 @@ $lng['admin']['phpsettings']['phpinisettings'] = 'php.ini settings';
 $lng['error']['nopermissionsorinvalidid'] = 'You don\'t have enough permissions to change these settings or an invalid id was given.';
 $lng['panel']['view'] = 'view';
 $lng['question']['phpsetting_reallydelete'] = 'Do you really want to delete these settings? All domains which use these settings currently will be changed to the default config.';
+$lng['question']['fpmsetting_reallydelete'] = 'Do you really want to delete these php-fpm settings? All php configurations which use these settings currently will be changed to the default config.';
 $lng['admin']['phpsettings']['addnew'] = 'Create new settings';
 $lng['error']['phpsettingidwrong'] = 'A PHP Configuration with this id doesn\'t exist';
 $lng['error']['descriptioninvalid'] = 'The description is too short, too long or contains illegal characters.';
@@ -1001,6 +1010,7 @@ $lng['error']['ipportdoesntexist'] = 'The ip/port combination you have chosen do
 
 $lng['admin']['phpserversettings'] = 'PHP Settings';
 $lng['admin']['phpsettings']['binary'] = 'PHP Binary';
+$lng['admin']['phpsettings']['fpmdesc'] = 'PHP-FPM config';
 $lng['admin']['phpsettings']['file_extensions'] = 'File extensions';
 $lng['admin']['phpsettings']['file_extensions_note'] = '(without dot, separated by spaces)';
 $lng['admin']['mod_fcgid_maxrequests']['title'] = 'Maximum php requests for this domain (empty for default value)';
@@ -1646,7 +1656,7 @@ $lng['admin']['usedmax'] = 'Used / Max';
 $lng['admin']['used'] = 'Used';
 $lng['mysql']['size'] = 'Size';
 
-$lng['error']['invalidhostname'] = 'Hostname can\'t be empty nor can it consist only of whitespaces';
+$lng['error']['invalidhostname'] = 'Hostname needs to be avalid domain. It can\'t be empty nor can it consist only of whitespaces';
 
 $lng['traffic']['http'] = 'HTTP (MiB)';
 $lng['traffic']['ftp'] = 'FTP (MiB)';
@@ -1656,7 +1666,7 @@ $lng['traffic']['mail'] = 'Mail (MiB)';
 $lng['serversettings']['mod_fcgid']['idle_timeout']['title'] = 'Idle Timeout';
 $lng['serversettings']['mod_fcgid']['idle_timeout']['description'] = 'Timeout setting for Mod FastCGI.';
 $lng['serversettings']['phpfpm_settings']['idle_timeout']['title'] = 'Idle Timeout';
-$lng['serversettings']['phpfpm_settings']['idle_timeout']['description'] = 'Timeout setting for PHP5 FPM FastCGI.';
+$lng['serversettings']['phpfpm_settings']['idle_timeout']['description'] = 'Timeout setting for PHP FPM FastCGI.';
 
 // ADDED IN 0.9.27-svn2
 $lng['panel']['cancel'] = 'Cancel';
@@ -1826,7 +1836,7 @@ $lng['serversettings']['panel_password_special_char_required']['description'] = 
 $lng['serversettings']['panel_password_special_char']['title'] = 'Special characters list';
 $lng['serversettings']['panel_password_special_char']['description'] = 'One of these characters is required if the above option is set.';
 $lng['phpfpm']['use_mod_proxy']['title'] = 'Use mod_proxy / mod_proxy_fcgi';
-$lng['phpfpm']['use_mod_proxy']['description'] = 'Activate to use php-fpm via mod_proxy_fcgi. Requires at least apache-2.4.9';
+$lng['phpfpm']['use_mod_proxy']['description'] = '<strong class="red">Must be enabled when using Debian 9.x (Stretch)</strong>. Activate to use php-fpm via mod_proxy_fcgi. Requires at least apache-2.4.9';
 $lng['error']['no_phpinfo'] = 'Sorry, unable to read phpinfo()';
 
 $lng['admin']['movetoadmin'] = 'Move customer';
@@ -1847,9 +1857,9 @@ $lng['usersettings']['custom_notes']['show'] = 'Show your notes on the dashboard
 $lng['error']['fcgidandphpfpmnogoodtogether'] = 'FCGID and PHP-FPM cannot be activated at the same time';
 
 // Added in Froxlor 0.9.34
-$lng['admin']['configfiles']['legend'] = 'You are about to configure a service/daemon. The following legend explains the nomenclature.';
+$lng['admin']['configfiles']['legend'] = '<h3>You are about to configure a service/daemon</h3>';
 $lng['admin']['configfiles']['commands'] = '<span class="red">Commands:</span> These commands are to be executed line by line as root-user in a shell. It is safe to copy the whole block and paste it into the shell.';
-$lng['admin']['configfiles']['files'] = '<span class="red">Configfiles:</span> This is an example of the contents of a configuration file. The commands before these textfields should open an editor with the target file. Just copy and paste the contents into the editor and save the file.<br><br><span class="red">Please note:</span> The MySQL-password has not been replaced for security reasons. Please replace "FROXLOR_MYSQL_PASSWORD" on your own. If you forgot your MySQL-password you\'ll find it in "lib/userdata.inc.php"';
+$lng['admin']['configfiles']['files'] = '<span class="red">Configfiles:</span> The commands before the textfields should open an editor with the target file. Just copy and paste the contents into the editor and save the file.<br><span class="red">Please note:</span> The MySQL-password has not been replaced for security reasons. Please replace "FROXLOR_MYSQL_PASSWORD" on your own or use the javascript form below to replace it on-site. If you forgot your MySQL-password you\'ll find it in "lib/userdata.inc.php"';
 $lng['serversettings']['apache_itksupport']['title'] = 'Use modifications for Apache ITK-MPM';
 $lng['serversettings']['apache_itksupport']['description'] = '<strong class="red">ATTENTION:</strong> use only if you acutally have apache itk-mpm enabled<br />otherwise your webserver will not be able to start';
 $lng['integrity_check']['DatabaseCharset'] = 'Characterset of database (should be UTF-8)';
@@ -1938,7 +1948,7 @@ $lng['admin']['letsencrypt']['description'] = 'Get a free certificate from <a hr
 $lng['customer']['letsencrypt']['title'] = 'Use Let\'s Encrypt';
 $lng['customer']['letsencrypt']['description'] = 'Get a free certificate from <a href="https://letsencrypt.org">Let\'s Encrypt</a>. The certificate will be created and renewed automatically.<br><strong class="red">ATTENTION:</strong> This feature is still in beta.';
 $lng['error']['sslredirectonlypossiblewithsslipport'] = 'Using Let\'s Encrypt is only possible when the domain has at least one ssl-enabled IP/port combination assigned.';
-$lng['error']['nowildcardwithletsencrypt'] = 'Let\'s Encrypt cannot (yet) handle wildcard-domains. Please set the ServerAlias to WWW or disable it completely';
+$lng['error']['nowildcardwithletsencrypt'] = 'Let\'s Encrypt cannot handle wildcard-domains using ACME v1. Please set the ServerAlias to WWW or disable it completely';
 $lng['panel']['letsencrypt'] = 'Using Let\'s encrypt';
 $lng['crondesc']['cron_letsencrypt'] = 'updating Let\'s Encrypt certificates';
 $lng['serversettings']['letsencryptca']['title'] = "Let's Encrypt environment";
@@ -2080,3 +2090,38 @@ $lng['admin']['domain_http2']['title'] = 'HTTP2 support';
 $lng['admin']['domain_http2']['description'] = 'See <a target="_blank" href="https://en.wikipedia.org/wiki/HTTP/2">Wikipedia</a> for a detailed explanation of HTTP2';
 $lng['admin']['testmail'] = 'SMTP test';
 $lng['success']['testmailsent'] = 'Test mail sent successfully';
+$lng['serversettings']['disable_le_selfcheck']['title'] = "Disable Let's Encrypt local self-check";
+$lng['serversettings']['disable_le_selfcheck']['description'] = "If activated, froxlor will <strong>not</strong> perform its self-check for token accessability. Needed for NATed IP's or similar.";
+$lng['menue']['phpsettings']['fpmdaemons'] = 'PHP-FPM versions';
+$lng['admin']['phpsettings']['activephpconfigs'] = 'In use for php-config(s)';
+$lng['admin']['phpsettingsforsubdomains'] = 'Apply php-config to all subdomains:';
+$lng['serversettings']['phpsettingsforsubdomains']['description'] = 'If yes the chosen php-config will be updated to all subdomains';
+$lng['serversettings']['leapiversion']['title'] = "Chose Let's Encrypt ACME implementation";
+$lng['serversettings']['leapiversion']['description'] = "Chose between ACME v1 and ACME v2 implementation for Let's Encrypt.";
+$lng['error']['nowildcardwithletsencryptv2'] = 'Let\'s Encrypt can only validate wildcard-domains by DNS with ACME v2, sorry. Please set the ServerAlias to WWW or disable it completely';
+$lng['admin']['phpsettings']['pass_authorizationheader'] = 'Add "-pass-header Authorization" / "CGIPassAuth On" to vhosts';
+$lng['serversettings']['ssl']['ssl_protocols']['title'] = 'Configure the TLS protocol version';
+$lng['serversettings']['ssl']['ssl_protocols']['description'] = 'This is a list of ssl protocols that you want (or don\'t want) to use when using SSL. <b>Notice:</b> Some older browsers may not support the newest protcol versions.<br /><br /><b>Default value is:</b><pre>TLSv1, TLSv1.2</pre>';
+$lng['serversettings']['phpfpm_settings']['limit_extensions']['title'] = 'Allowed extensions';
+$lng['serversettings']['phpfpm_settings']['limit_extensions']['description'] = 'Limits the extensions of the main script FPM will allow to parse. This can prevent configuration mistakes on the web server side. You should only limit FPM to .php extensions to prevent malicious users to use other extensions to execute php code. Default value: .php';
+$lng['phpfpm']['ini_flags'] = 'Enter possible <strong>php_flag</strong>s for php.ini. One entry per line';
+$lng['phpfpm']['ini_values'] = 'Enter possible <strong>php_value</strong>s for php.ini. One entry per line';
+$lng['phpfpm']['ini_admin_flags'] = 'Enter possible <strong>php_admin_flag</strong>s for php.ini. One entry per line';
+$lng['phpfpm']['ini_admin_values'] = 'Enter possible <strong>php_admin_value</strong>s for php.ini. One entry per line';
+$lng['serversettings']['phpfpm_settings']['envpath'] = 'Paths to add to the PATH environment. Leave empty for no PATH environment variable';
+$lng['admin']['configfiles']['importexport'] = 'Import/Export';
+$lng['success']['settingsimported'] = 'Settings imported successfully';
+$lng['error']['jsonextensionnotfound'] = 'This feature requires the php json-extension.';
+
+// added in froxlor 0.9.39
+$lng['admin']['plans']['name'] = 'Plan name';
+$lng['admin']['plans']['description'] = 'Description';
+$lng['admin']['plans']['last_update'] = 'Last updated';
+$lng['admin']['plans']['plans'] = 'Hosting plans';
+$lng['admin']['plans']['plan_details'] = 'Plan details';
+$lng['admin']['plans']['add'] = 'Add new plan';
+$lng['admin']['plans']['edit'] = 'Edit plan';
+$lng['admin']['plans']['use_plan'] = 'Apply plan';
+$lng['question']['plan_reallydelete'] = 'Do you really want to delete the hosting plan %s?';
+$lng['admin']['notryfiles']['title'] = 'No autogenerated try_files';
+$lng['admin']['notryfiles']['description'] = 'Say yes here if you want to specify a custom try_files directive in specialsettings (needed for some wordpress plugins for example).';

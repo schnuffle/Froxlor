@@ -19,7 +19,11 @@ $header
 					<tr>
 						<th>{$lng['admin']['phpsettings']['description']}</th>
 						<th>{$lng['admin']['phpsettings']['activedomains']}</th>
-						<th>{$lng['admin']['phpsettings']['binary']}</th>
+						<if Settings::Get('phpfpm.enabled') == '1'>
+							<th>{$lng['admin']['phpsettings']['fpmdesc']}</th>
+						<else>
+							<th>{$lng['admin']['phpsettings']['binary']}</th>
+						</if>
 						<th>{$lng['admin']['phpsettings']['file_extensions']}</th>
 						<th>{$lng['panel']['options']}</th>
 				</thead>

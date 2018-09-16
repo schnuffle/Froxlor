@@ -30,7 +30,6 @@ class lescript
 {
 
 	// https://letsencrypt.org/repository/
-	public $license;
 
 	private $logger;
 
@@ -111,19 +110,7 @@ class lescript
 			}
 			$accountUrl=$this->client->getLastLocation();
 
-			$this->log('Accepting lets encrypt Terms of Service');
-
-			$this->license = $this->client->getAgreementURL();
-
-			// Terms of Service are optional according to ACME specs; if no ToS are presented, no need to update registration
-			if (!empty($this->license)) {
-				$response = $this->postRegAgreement(parse_url($accountUrl, PHP_URL_PATH));
-				if ($this->client->getLastCode() != 202) {
-					throw new \RuntimeException("Terms of Service not accepted. Whole response: " . json_encode($response));
-				}
-			}
-
-			$leregistered=1;
+			$leregistered = 1;
 			$this->setLeRegisteredState($leregistered); // Account registered
 			$this->log('Lets encrypt Terms of Service accepted');
 		}
@@ -227,18 +214,18 @@ class lescript
 			$this->log("Token for $domain saved at $tokenPath and should be available at $uri");
 
 			// simple self check
-			$selfcheckContextOptions = array('http' => array('header' => "User-Agent: Froxlor/".$this->version));
-			$selfcheckContext = stream_context_create($selfcheckContextOptions);
-			if ($payload !== trim(@file_get_contents($uri, false, $selfcheckContext))) {
-				$errmsg = json_encode(error_get_last());
-				if ($errmsg != "null") {
-					$errmsg = "; PHP error: " . $errmsg;
-				} else {
-					$errmsg = "";
+			if (Settings::Get('system.disable_le_selfcheck') == '0')
+			{
+				$selfcheckpayload = HttpClient::urlGet($uri);
+				if ($payload !== trim($selfcheckpayload)) {
+					$errmsg = json_encode(error_get_last());
+					if ($errmsg != "null") {
+						$errmsg = "; PHP error: " . $errmsg;
+					} else {
+						$errmsg = "";
+					}
+					$this->logger->logAction(CRON_ACTION, LOG_WARNING, "[Lets Encrypt self-check] Please check $uri - token seems to be not available. This is just a simple self-check, it might be wrong but consider using this information when Let's Encrypt fails to issue a certificate" . $errmsg);
 				}
-				@unlink($tokenPath);
-				$this->logger->logAction(CRON_ACTION, LOG_ERR, "letsencrypt Please check $uri - token not available" . $errmsg);
-				continue;
 			}
 
 			$this->log("Sending request to challenge");
@@ -372,21 +359,16 @@ class lescript
 
 	private function postNewReg()
 	{
+		$this->log('Getting last terms of service URL');
+		$directory = $this->client->get('/directory');
+		if (!isset($directory['meta']) || !isset($directory['meta']['terms-of-service'])) {
+			throw new \RuntimeException("No terms of service link available!");
+		}
 		$this->log('Sending registration to letsencrypt server');
 
 		return $this->signedRequest('/acme/new-reg', array(
 			'resource' => 'new-reg',
-			'agreement' => $this->license
-		));
-	}
-
-	private function postRegAgreement($uri)
-	{
-		$this->log('Accepting agreement at URL: ' . $this->license);
-
-		return $this->signedRequest($uri, array(
-			'resource' => 'reg',
-			'agreement' => $this->license
+			'agreement' => $directory['meta']['terms-of-service']
 		));
 	}
 
@@ -591,49 +573,6 @@ class Client
 		preg_match_all('~Link: <(.+)>;rel="up"~', $this->lastHeader, $matches);
 		return $matches[1];
 	}
-
-	public function getAgreementURLFromLastResponse()
-	{
-		if (preg_match_all('~Link: <(.+)>;rel="terms-of-service"~', $this->lastHeader, $matches)) {
-			return $matches[1][0];
-		}
-		return "";
-	}
-	public function getAgreementURLFromDirectory()
-	{
-		// FIXME: Current license should be found in /directory but LE does not implement this yet
-		// $this->curl('GET', '/directory');
-		return "";
-	}
-	public function getAgreementURLFromTermsUrl()
-	{
-		$this->curl('GET', '/terms');
-		if (preg_match_all('~Location: (.+)~', $this->lastHeader, $matches)) {
-			return trim($matches[1][0]);
-		}
-		return "";
-	}
-
-	public function getAgreementURL()
-	{
-		// 1. check the header of the last response
-		$license=$this->getAgreementURLFromLastResponse();
-		if (!empty($license)) return $license;
-
-		// 2. query directory for license
-		$license=$this->getAgreementURLFromDirectory();
-		if (!empty($license)) return $license;
-
-		// 3. query /terms endpoint (not ACME standard but implemented by let's enrypt)
-		$license=$this->getAgreementURLFromTermsUrl();
-		if (!empty($license)) return $license;
-
-		// Fallback: use latest known license. This is only valid for let's encrypt and should be removed as soon as there is an official
-		// ACME-endpoint to get the current ToS
-		return "https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf";
-		// return "";
-	}
-
 }
 
 class Base64UrlSafeEncoder

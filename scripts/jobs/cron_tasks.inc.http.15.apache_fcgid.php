@@ -44,7 +44,15 @@ class apache_fcgid extends apache
 				if (Settings::Get('system.apache24') == '1'
 					&& Settings::Get('phpfpm.use_mod_proxy') == '1'
 				) {
-					$php_options_text.= '  <FilesMatch \.php$>'. "\n";
+					$filesmatch = $phpconfig['fpm_settings']['limit_extensions'];
+					$extensions = explode(" ", $filesmatch);
+					$filesmatch = "";
+					foreach ($extensions as $ext) {
+						$filesmatch .= substr($ext, 1).'|';
+					}
+					// start block, cut off last pipe and close block
+					$filesmatch = '('.str_replace(".", "\.", substr($filesmatch, 0, -1)).')';
+					$php_options_text.= '  <FilesMatch \.'.$filesmatch.'$>'. "\n";
 					$php_options_text.= '  SetHandler proxy:unix:' . $php->getInterface()->getSocketFile()  . '|fcgi://localhost'. "\n";
 					$php_options_text.= '  </FilesMatch>' . "\n";
 
@@ -54,17 +62,37 @@ class apache_fcgid extends apache
 				    // for this path, as this would be the first require and therefore grant all access
 				    if ($mypath_dir->isUserProtected() == false) {
 						$php_options_text.= '  <Directory "' . makeCorrectDir($domain['documentroot']) . '">' . "\n";
+						if ($phpconfig['pass_authorizationheader'] == '1') {
+							$php_options_text.= '    CGIPassAuth On' . "\n";
+						}
 					    $php_options_text.= '    Require all granted' . "\n";
 						$php_options_text.= '    AllowOverride All' . "\n";
+						$php_options_text.= '  </Directory>' . "\n";
+				    } elseif ($phpconfig['pass_authorizationheader'] == '1') {
+						// allow Pass of Authorization header
+						$php_options_text.= '  <Directory "' . makeCorrectDir($domain['documentroot']) . '">' . "\n";
+						$php_options_text.= '    CGIPassAuth On' . "\n";
 						$php_options_text.= '  </Directory>' . "\n";
 				    }
 
 				} else {
-					$php_options_text.= '  FastCgiExternalServer ' . $php->getInterface()->getAliasConfigDir() . $srvName . ' -socket ' . $php->getInterface()->getSocketFile()  . ' -idle-timeout ' . Settings::Get('phpfpm.idle_timeout') . "\n";
+					$addheader = "";
+					if ($phpconfig['pass_authorizationheader'] == '1') {
+						$addheader = " -pass-header Authorization";
+					}
+					$php_options_text.= '  FastCgiExternalServer ' . $php->getInterface()->getAliasConfigDir() . $srvName . ' -socket ' . $php->getInterface()->getSocketFile()  . ' -idle-timeout ' . $phpconfig['fpm_settings']['idle_timeout'] . $addheader . "\n";
 					$php_options_text.= '  <Directory "' . makeCorrectDir($domain['documentroot']) . '">' . "\n";
-					$php_options_text.= '    <FilesMatch "\.php$">' . "\n";
-					$php_options_text.= '      SetHandler php5-fastcgi'. "\n";
-					$php_options_text.= '      Action php5-fastcgi /fastcgiphp' . "\n";
+					$filesmatch = $phpconfig['fpm_settings']['limit_extensions'];
+					$extensions = explode(" ", $filesmatch);
+					$filesmatch = "";
+					foreach ($extensions as $ext) {
+						$filesmatch .= substr($ext, 1).'|';
+					}
+					// start block, cut off last pipe and close block
+					$filesmatch = '('.str_replace(".", "\.", substr($filesmatch, 0, -1)).')';
+					$php_options_text.= '    <FilesMatch \.'.$filesmatch.'$>'. "\n";
+					$php_options_text.= '      SetHandler php-fastcgi'. "\n";
+					$php_options_text.= '      Action php-fastcgi /fastcgiphp' . "\n";
 					$php_options_text.= '      Options +ExecCGI' . "\n";
 					$php_options_text.= '    </FilesMatch>' . "\n";
 					// >=apache-2.4 enabled?
@@ -155,6 +183,16 @@ class apache_fcgid extends apache
 			) {
 				$user = Settings::Get('phpfpm.vhost_httpuser');
 				$group = Settings::Get('phpfpm.vhost_httpgroup');
+				
+				// get fpm config
+				$fpm_sel_stmt = Database::prepare("
+					SELECT f.id FROM `" . TABLE_PANEL_FPMDAEMONS . "` f
+					LEFT JOIN `" . TABLE_PANEL_PHPCONFIGS . "` p ON p.fpmsettingid = f.id
+					WHERE p.id = :phpconfigid
+				");
+				$fpm_config = Database::pexecute_first($fpm_sel_stmt, array(
+					'phpconfigid' => Settings::Get('phpfpm.vhost_defaultini')
+				));
 			}
 
 			$domain = array(
@@ -167,7 +205,8 @@ class apache_fcgid extends apache
 				'openbasedir' => 0,
 				'email' => Settings::Get('panel.adminmail'),
 				'loginname' => 'froxlor.panel',
-				'documentroot' => $mypath
+				'documentroot' => $mypath,
+				'fpm_config_id' => isset($fpm_config['id']) ? $fpm_config['id'] : 1
 			);
 
 			// all the files and folders have to belong to the local user

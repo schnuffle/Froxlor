@@ -20,6 +20,12 @@ if (! defined('MASTER_CRONJOB'))
  *
  */
 
+if (Settings::Get('system.leapiversion') == '2') {
+	// use ACME v2 is specified
+	require_once __DIR__ . '/cron_letsencrypt_v2.php';
+	exit;
+}
+
 $cronlog->logAction(CRON_ACTION, LOG_INFO, "Updating Let's Encrypt certificates");
 
 if (! extension_loaded('curl')) {
@@ -54,6 +60,7 @@ $certificates_stmt = Database::query("
 				dom.`id` = domssl.`domainid`
 		WHERE
 			dom.`customerid` = cust.`customerid`
+			AND cust.deactivated = 0
 			AND dom.`letsencrypt` = 1
 			AND dom.`aliasdomain` IS NULL
 			AND dom.`iswildcarddomain` = 0
@@ -86,6 +93,7 @@ $updcert_stmt = Database::prepare("
 			`ssl_ca_file` = :ca,
 			`ssl_cert_chainfile` = :chain,
 			`ssl_csr_file` = :csr,
+			`ssl_fullchain_file` = :fullchain,
 			`expirationdate` = :expirationdate
 	");
 
@@ -176,6 +184,7 @@ if (Settings::Get('system.le_froxlor_enabled') == '1') {
 				'ca' => $return['chain'],
 				'chain' => $return['chain'],
 				'csr' => $return['csr'],
+				'fullchain' => $return['fullchain'],
 				'expirationdate' => date('Y-m-d H:i:s', $newcert['validTo_time_t'])
 			));
 
@@ -251,6 +260,7 @@ foreach ($certrows as $certrow) {
 				'ca' => $return['chain'],
 				'chain' => $return['chain'],
 				'csr' => $return['csr'],
+				'fullchain' => $return['fullchain'],
 				'expirationdate' => date('Y-m-d H:i:s', $newcert['validTo_time_t'])
 			));
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <froxlor>
-	<distribution name="Ubuntu" codename="Precise" version="12.04" defaulteditor="/usr/bin/nano">
+	<distribution name="Ubuntu" codename="Precise" version="12.04" defaulteditor="/usr/bin/nano" deprecated="true">
 		<services>
 			<!-- HTTP -->
 			<service type="http" title="{{lng.admin.configfiles.http}}">
@@ -49,6 +49,11 @@
 					<include>//service[@type='http']/general/commands</include>
 					<command><![CDATA[a2dismod userdir]]></command>
 					<command><![CDATA[a2enmod headers]]></command>
+					<command>
+						<visibility mode="true">{{settings.system.use_ssl}}
+						</visibility>
+						<content><![CDATA[a2enmod ssl]]></content>
+					</command>
 					<file name="/etc/apache2/mods-enabled/fastcgi.conf">
 						<visibility mode="true">{{settings.phpfpm.enabled}}
 						</visibility>
@@ -334,7 +339,7 @@ exit "$RETVAL"
 			<!--DNS -->
 			<service type="dns" title="{{lng.admin.configfiles.dns}}">
 				<!--Bind9 -->
-				<daemon name="bind" title="Bind9 nameserver">
+				<daemon name="bind" title="Bind9 nameserver" default="true">
 					<install><![CDATA[apt-get install bind9]]></install>
 					<command><![CDATA[echo "include \"{{settings.system.bindconf_directory}}froxlor_bind.conf\";" >> /etc/bind/named.conf]]></command>
 					<command><![CDATA[touch {{settings.system.bindconf_directory}}froxlor_bind.conf]]></command>
@@ -726,7 +731,7 @@ smtpd_sasl_local_domain = $myhostname
 broken_sasl_auth_clients = yes
 
 # Virtual delivery settings
-virtual_mailbox_base = <VIRTUAL_MAILBOX_BASE>
+virtual_mailbox_base = /
 virtual_mailbox_maps = mysql:/etc/postfix/mysql-virtual_mailbox_maps.cf
 virtual_mailbox_domains = mysql:/etc/postfix/mysql-virtual_mailbox_domains.cf
 virtual_alias_maps = mysql:/etc/postfix/mysql-virtual_alias_maps.cf
@@ -1143,10 +1148,17 @@ MYSQL_AUXOPTIONS_FIELD CONCAT("allowimap=",imap,",allowpop3=",pop3)
 				<!-- Proftpd -->
 				<daemon name="proftpd" title="ProFTPd" default="true">
 					<install><![CDATA[apt-get install proftpd-basic proftpd-mod-mysql]]></install>
-					<commands>
-						<command><![CDATA[[ -f /etc/ssl/certs/proftpd.crt ] || openssl req -new -x509 -newkey rsa:4096 -days 3650 -nodes -out /etc/ssl/certs/proftpd.crt -keyout /etc/ssl/private/proftpd.key -subj "/C=US/ST=Some-State/O=Internet Widgits Pty Ltd/CN=<SERVERNAME>"]]></command>
-						<command><![CDATA[[ -f /etc/ssl/certs/proftpd_ec.crt ] || openssl req -new -x509 -nodes -newkey ec:<(openssl ecparam -name secp521r1) -keyout /etc/ssl/private/proftpd_ec.key -out /etc/ssl/certs/proftpd_ec.crt -days 3650 -subj "/C=US/ST=Some-State/O=Internet Widgits Pty Ltd/CN=<SERVERNAME>"]]></command>
-						<command><![CDATA[chmod 0600 /etc/ssl/private/proftpd.key /etc/ssl/private/proftpd_ec.key]]></command>
+					<file name="/etc/proftpd/create-cert.sh" chown="root:0" chmod="0700">
+						<content><![CDATA[#!/bin/bash
+[ -f /etc/ssl/certs/proftpd.crt ] || openssl req -new -x509 -newkey rsa:4096 -days 3650 -nodes -out /etc/ssl/certs/proftpd.crt -keyout /etc/ssl/private/proftpd.key -subj "/C=US/ST=Some-State/O=Internet Widgits Pty Ltd/CN=<SERVERNAME>"
+[ -f /etc/ssl/certs/proftpd_ec.crt ] || openssl req -new -x509 -nodes -newkey ec:<(openssl ecparam -name secp521r1) -keyout /etc/ssl/private/proftpd_ec.key -out /etc/ssl/certs/proftpd_ec.crt -days 3650 -subj "/C=US/ST=Some-State/O=Internet Widgits Pty Ltd/CN=<SERVERNAME>"
+chmod 0600 /etc/ssl/private/proftpd.key /etc/ssl/private/proftpd_ec.key
+]]>
+						</content>
+					</file>
+					<commands index="1">
+						<command><![CDATA[/etc/proftpd/create-cert.sh]]></command>
+						<command><![CDATA[rm -f /etc/proftpd/create-cert.sh]]></command>
 					</commands>
 					<file name="/etc/proftpd/proftpd.conf" chown="root:0" chmod="0600"
 						backup="true">
@@ -1638,12 +1650,14 @@ aliases:     files
 					<install><![CDATA[apt-get install nscd libnss-extrausers]]></install>
 					<commands index="1">
 						<command><![CDATA[mkdir -p /var/lib/extrausers]]></command>
-						<command><![CDATA[touch /var/lib/extrausers/{passwd,group,shadow}]]></command>
+						<command><![CDATA[touch /var/lib/extrausers/passwd]]></command>
+						<command><![CDATA[touch /var/lib/extrausers/group]]></command>
+						<command><![CDATA[touch /var/lib/extrausers/shadow]]></command>
 					</commands>
 					<file name="/etc/nsswitch.conf" backup="true">
 						<content><![CDATA[
-# Make sure that `passwd`, `group` and `shadow` have mysql in their lines
-# You should place mysql at the end, so that it is queried after the other mechanisams
+# Make sure that `passwd`, `group` and `shadow` have extrausers in their lines
+# You should place extrausers at the end, so that it is queried after the other mechanisams
 #
 passwd:         compat extrausers
 group:          compat extrausers
@@ -1744,6 +1758,11 @@ aliases:     files
 						<visibility mode="true">{{settings.phpfpm.enabled_ownvhost}}
 						</visibility>
 						<command><![CDATA[a2dismod php5]]></command>
+					</commands>
+					<commands index="5">
+						<visibility mode="equals" value="apache2">{{settings.system.webserver}}
+						</visibility>
+						<command><![CDATA[/etc/init.d/apache2 restart]]></command>
 					</commands>
 					<!-- instead of just restarting apache, we let the cronjob do all the
 						dirty work -->

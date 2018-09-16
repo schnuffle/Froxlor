@@ -51,5 +51,7 @@ define('TABLE_PANEL_DOMAINREDIRECTS', 'domain_redirect_codes');
 define('TABLE_PANEL_DOMAIN_SSL_SETTINGS', 'domain_ssl_settings');
 define('TABLE_DOMAINTOIP', 'panel_domaintoip');
 define('TABLE_DOMAIN_DNS', 'domain_dns_entries');
+define('TABLE_PANEL_FPMDAEMONS', 'panel_fpmdaemons');
+define('TABLE_PANEL_PLANS', 'panel_plans');
 
 require dirname(__FILE__).'/version.inc.php';

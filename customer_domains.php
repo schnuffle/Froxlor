@@ -327,15 +327,15 @@ if ($page == 'overview') {
 				}
 
 				if (!preg_match('/^https?\:\/\//', $path) || !validateUrl($path)) {
+					if (strstr($path, ":") !== FALSE) {
+						standard_error('pathmaynotcontaincolon');
+					}
 					// If path is empty or '/' and 'Use domain name as default value for DocumentRoot path' is enabled in settings,
 					// set default path to subdomain or domain name
 					if ((($path == '') || ($path == '/')) && Settings::Get('system.documentroot_use_default_value') == 1) {
 						$path = makeCorrectDir($userinfo['documentroot'] . '/' . $completedomain);
 					} else {
 						$path = makeCorrectDir($userinfo['documentroot'] . '/' . $path);
-					}
-					if (strstr($path, ":") !== FALSE) {
-						standard_error('pathmaynotcontaincolon');
 					}
 				} else {
 					$_doredirect = true;
@@ -404,6 +404,10 @@ if ($page == 'overview') {
 					if (!isset($phpsid_result['phpsettingid']) || (int)$phpsid_result['phpsettingid'] <= 0) {
 						// assign default config
 						$phpsid_result['phpsettingid'] = 1;
+					}
+					// check whether the customer has chosen its own php-config
+					if (isset($_POST['phpsettingid']) && intval($_POST['phpsettingid']) != $phpsid_result['phpsettingid']) {
+						$phpsid_result['phpsettingid'] = intval($_POST['phpsettingid']);
 					}
 
 					$stmt = Database::prepare("INSERT INTO `" . TABLE_PANEL_DOMAINS . "` SET
@@ -534,6 +538,27 @@ if ($page == 'overview') {
 				$openbasedir = makeoption($lng['domain']['docroot'], 0, NULL, true) . makeoption($lng['domain']['homedir'], 1, NULL, true);
 				$pathSelect = makePathfield($userinfo['documentroot'], $userinfo['guid'], $userinfo['guid']);
 
+				$phpconfigs = '';
+				$has_phpconfigs = false;
+				if (isset($userinfo['allowed_phpconfigs']) && !empty($userinfo['allowed_phpconfigs']))
+				{
+					$has_phpconfigs = true;
+					$allowed_cfg = json_decode($userinfo['allowed_phpconfigs'], JSON_OBJECT_AS_ARRAY);
+					$phpconfigs_result_stmt = Database::query("
+						SELECT c.*, fc.description as interpreter
+						FROM `" . TABLE_PANEL_PHPCONFIGS . "` c
+						LEFT JOIN `" . TABLE_PANEL_FPMDAEMONS . "` fc ON fc.id = c.fpmsettingid
+						WHERE c.id IN (".implode(", ", $allowed_cfg).")
+					");
+					while ($phpconfigs_row = $phpconfigs_result_stmt->fetch(PDO::FETCH_ASSOC)) {
+						if ((int) Settings::Get('phpfpm.enabled') == 1) {
+							$phpconfigs .= makeoption($phpconfigs_row['description'] . " [".$phpconfigs_row['interpreter']."]", $phpconfigs_row['id'], Settings::Get('phpfpm.defaultini'), true, true);
+						} else {
+							$phpconfigs .= makeoption($phpconfigs_row['description'], $phpconfigs_row['id'], Settings::Get('system.mod_fcgid_defaultini'), true, true);
+						}
+					}
+				}
+
 				$subdomain_add_data = include_once dirname(__FILE__).'/lib/formfields/customer/domains/formfield.domains_add.php';
 				$subdomain_add_form = htmlform::genHTMLForm($subdomain_add_data);
 
@@ -571,15 +596,15 @@ if ($page == 'overview') {
 				}
 
 				if (!preg_match('/^https?\:\/\//', $path) || !validateUrl($path)) {
+					if (strstr($path, ":") !== FALSE) {
+						standard_error('pathmaynotcontaincolon');
+					}
 					// If path is empty or '/' and 'Use domain name as default value for DocumentRoot path' is enabled in settings,
 					// set default path to subdomain or domain name
 					if ((($path == '') || ($path == '/')) && Settings::Get('system.documentroot_use_default_value') == 1) {
 						$path = makeCorrectDir($userinfo['documentroot'] . '/' . $result['domain']);
 					} else {
 						$path = makeCorrectDir($userinfo['documentroot'] . '/' . $path);
-					}
-					if (strstr($path, ":") !== FALSE) {
-						standard_error('pathmaynotcontaincolon');
 					}
 				} else {
 					$_doredirect = true;
@@ -624,6 +649,13 @@ if ($page == 'overview') {
 					$openbasedir_path = '0';
 				}
 
+				// check whether the customer has chosen its own php-config
+				if (isset($_POST['phpsettingid'])) {
+					$phpsettingid = intval($_POST['phpsettingid']);
+				} else {
+					$phpsettingid = $result['phpsettingid'];
+				}
+
 				if (isset($_POST['ssl_redirect']) && $_POST['ssl_redirect'] == '1') {
 					// a ssl-redirect only works if there actually is a
 					// ssl ip/port assigned to the domain
@@ -649,9 +681,14 @@ if ($page == 'overview') {
 					$letsencrypt = '0';
 				}
 
-				// We can't enable let's encrypt for wildcard - domains
-				if ($iswildcarddomain == '1' && $letsencrypt == '1') {
+				// We can't enable let's encrypt for wildcard - domains when using acme-v1
+				if ($iswildcarddomain == '1' && $letsencrypt == '1' && Settings::Get('system.leapiversion') == '1') {
 					standard_error('nowildcardwithletsencrypt');
+				}
+				// if using acme-v2 we cannot issue wildcard-certificates
+				// because they currently only support the dns-01 challenge
+				if ($iswildcarddomain == '0' && $letsencrypt == '1' && Settings::Get('system.leapiversion') == '2') {
+					standard_error('nowildcardwithletsencryptv2');
 				}
 
 				// Temporarily deactivate ssl_redirect until Let's Encrypt certificate was generated
@@ -692,6 +729,7 @@ if ($page == 'overview') {
 						|| $hsts_maxage != $result['hsts']
 						|| $hsts_sub != $result['hsts_sub']
 						|| $hsts_preload != $result['hsts_preload']
+						|| $phpsettingid != $result['phpsettingid']
 					) {
 						$log->logAction(USR_ACTION, LOG_INFO, "edited domain '" . $idna_convert->decode($result['domain']) . "'");
 
@@ -706,7 +744,8 @@ if ($page == 'overview') {
 							`letsencrypt`= :letsencrypt,
 							`hsts` = :hsts,
 							`hsts_sub` = :hsts_sub,
-							`hsts_preload` = :hsts_preload
+							`hsts_preload` = :hsts_preload,
+							`phpsettingid` = :phpsettingid
 							WHERE `customerid`= :customerid
 							AND `id`= :id"
 						);
@@ -722,6 +761,7 @@ if ($page == 'overview') {
 							"hsts" => $hsts_maxage,
 							"hsts_sub" => $hsts_sub,
 							"hsts_preload" => $hsts_preload,
+							"phpsettingid" => $phpsettingid,
 							"customerid" => $userinfo['customerid'],
 							"id" => $id
 						);
@@ -733,7 +773,15 @@ if ($page == 'overview') {
 							triggerLetsEncryptCSRForAliasDestinationDomain($aliasdomain, $log);
 						} elseif ($result['wwwserveralias'] != $wwwserveralias || $result['letsencrypt'] != $letsencrypt) {
 							// or when wwwserveralias or letsencrypt was changed
+
 							triggerLetsEncryptCSRForAliasDestinationDomain($aliasdomain, $log);
+
+							if ($aliasdomain === 0) {
+								// in case the wwwserveralias is set on a main domain, $aliasdomain is 0
+								// --> the call just above to triggerLetsEncryptCSRForAliasDestinationDomain
+								//     is a noop...let's repeat it with the domain id of the main domain
+								triggerLetsEncryptCSRForAliasDestinationDomain($id, $log);
+							}
 						}
 
 						// check whether LE has been disabled, so we remove the certificate
@@ -844,6 +892,27 @@ if ($page == 'overview') {
 				$result_ipandport['ip'] = '';
 				while ($rowip = $ips_stmt->fetch(PDO::FETCH_ASSOC)) {
 					$result_ipandport['ip'] .= $rowip['ip'] . "<br />";
+				}
+
+				$phpconfigs = '';
+				$has_phpconfigs = false;
+				if (isset($userinfo['allowed_phpconfigs']) && !empty($userinfo['allowed_phpconfigs']))
+				{
+					$has_phpconfigs = true;
+					$allowed_cfg = json_decode($userinfo['allowed_phpconfigs'], JSON_OBJECT_AS_ARRAY);
+					$phpconfigs_result_stmt = Database::query("
+						SELECT c.*, fc.description as interpreter
+						FROM `" . TABLE_PANEL_PHPCONFIGS . "` c
+						LEFT JOIN `" . TABLE_PANEL_FPMDAEMONS . "` fc ON fc.id = c.fpmsettingid
+						WHERE c.id IN (".implode(", ", $allowed_cfg).")
+					");
+					while ($phpconfigs_row = $phpconfigs_result_stmt->fetch(PDO::FETCH_ASSOC)) {
+						if ((int) Settings::Get('phpfpm.enabled') == 1) {
+							$phpconfigs .= makeoption($phpconfigs_row['description'] . " [".$phpconfigs_row['interpreter']."]", $phpconfigs_row['id'], $result['phpsettingid'], true, true);
+						} else {
+							$phpconfigs .= makeoption($phpconfigs_row['description'], $phpconfigs_row['id'], $result['phpsettingid'], true, true);
+						}
+					}
 				}
 
 				$domainip = $result_ipandport['ip'];

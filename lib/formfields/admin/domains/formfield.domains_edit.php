@@ -161,6 +161,21 @@ return array(
 						'value' => array(
 							'1'
 						)
+					),
+					'notryfiles' => array(
+						'visible' => (Settings::Get('system.webserver') == 'nginx' && $userinfo['change_serversettings'] == '1'),
+						'label' => $lng['admin']['notryfiles']['title'],
+						'desc' => $lng['admin']['notryfiles']['description'],
+						'type' => 'checkbox',
+						'values' => array(
+							array(
+								'label' => $lng['panel']['yes'],
+								'value' => '1'
+							)
+						),
+						'value' => array(
+							$result['notryfiles']
+						)
 					)
 				)
 			),
@@ -208,7 +223,7 @@ return array(
 						)
 					),
 					'http2' => array(
-						'visible' => ($ssl_ipsandports != '' ? true : false) && Settings::Get('system.webserver') != 'lighttpd',
+						'visible' => ($ssl_ipsandports != '' ? true : false) && Settings::Get('system.webserver') != 'lighttpd' && Settings::Get('system.http2_support') == '1',
 						'label' => $lng['admin']['domain_http2']['title'],
 						'desc' => $lng['admin']['domain_http2']['description'],
 						'type' => 'checkbox',
@@ -324,6 +339,21 @@ return array(
 						'label' => $lng['admin']['phpsettings']['title'],
 						'type' => 'select',
 						'select_var' => $phpconfigs
+					),
+					'phpsettingsforsubdomains' => array(
+						'visible' => ($userinfo['change_serversettings'] == '1' ? true : false),
+						'label' => $lng['admin']['phpsettingsforsubdomains'],
+						'desc' => $lng['serversettings']['phpsettingsforsubdomains']['description'],
+						'type' => 'checkbox',
+						'values' => array(
+							array(
+								'label' => $lng['panel']['yes'],
+								'value' => '1'
+							)
+						),
+						'value' => array(
+							'1'
+						)
 					),
 					'mod_fcgid_starter' => array(
 						'visible' => ((int) Settings::Get('system.mod_fcgid') == 1 ? true : false),

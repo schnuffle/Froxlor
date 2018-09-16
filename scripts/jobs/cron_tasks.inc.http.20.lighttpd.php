@@ -58,8 +58,22 @@ class lighttpd extends HttpConfigBase
 	public function reload()
 	{
 		if ((int) Settings::Get('phpfpm.enabled') == 1) {
-			$this->logger->logAction(CRON_ACTION, LOG_INFO, 'lighttpd::reload: reloading php-fpm');
-			safe_exec(escapeshellcmd(Settings::Get('phpfpm.reload')));
+			// get all start/stop commands
+			$startstop_sel = Database::prepare("SELECT reload_cmd, config_dir FROM `" . TABLE_PANEL_FPMDAEMONS . "`");
+			Database::pexecute($startstop_sel);
+			$restart_cmds = $startstop_sel->fetchAll(PDO::FETCH_ASSOC);
+			// restart all php-fpm instances
+			foreach ($restart_cmds as $restart_cmd) {
+				// check whether the config dir is empty (no domains uses this daemon)
+				// so we need to create a dummy
+				$_conffiles = glob(makeCorrectFile($restart_cmd['config_dir'] . "/*.conf"));
+				if ($_conffiles === false || empty($_conffiles)) {
+					$this->logger->logAction(CRON_ACTION, LOG_INFO, 'lighttpd::reload: fpm config directory "' . $restart_cmd['config_dir'] . '" is empty. Creating dummy.');
+					phpinterface_fpm::createDummyPool($restart_cmd['config_dir']);
+				}
+				$this->logger->logAction(CRON_ACTION, LOG_INFO, 'lighttpd::reload: running ' . $restart_cmd['reload_cmd']);
+				safe_exec(escapeshellcmd($restart_cmd['reload_cmd']));
+			}
 		}
 		$this->logger->logAction(CRON_ACTION, LOG_INFO, 'lighttpd::reload: reloading lighttpd');
 		safe_exec(escapeshellcmd(Settings::Get('system.apachereload_command')));
@@ -452,7 +466,7 @@ class lighttpd extends HttpConfigBase
 			$uri = $domain['documentroot'];
 
 			// Get domain's redirect code
-			$code = getDomainRedirectCode($domain['id'], '301');
+			$code = getDomainRedirectCode($domain['id']);
 
 			$vhost_content .= '  url.redirect-code = ' . $code. "\n";
 			$vhost_content .= '  url.redirect = (' . "\n";
